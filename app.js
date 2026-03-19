@@ -12,11 +12,13 @@
 
     // Rarity tiers with base combat stats (big numbers)
     const RARITY_TIERS = [
-        { name: "legendary",  label: "Legendary",  min: 1_000_000_000, color: "#ffb628", weight: 3,  atk: 950, def: 800, hp: 5500 },
-        { name: "super-rare", label: "Super Rare", min: 100_000_000,   color: "#c24eff", weight: 8,  atk: 720, def: 600, hp: 4200 },
-        { name: "rare",       label: "Rare",       min: 10_000_000,    color: "#4a9eff", weight: 20, atk: 520, def: 440, hp: 3000 },
-        { name: "uncommon",   label: "Uncommon",   min: 1_000_000,     color: "#4ec94e", weight: 35, atk: 350, def: 300, hp: 2100 },
-        { name: "common",     label: "Common",     min: 0,             color: "#8899aa", weight: 34, atk: 200, def: 170, hp: 1400 },
+        { name: "mythic",     label: "Mythic",     min: 5_000_000_000, color: "#ff44cc", weight: 1,  atk: 1200, def: 1000, hp: 7000 },
+        { name: "legendary",  label: "Legendary",  min: 1_000_000_000, color: "#ffb628", weight: 3,  atk: 950,  def: 800,  hp: 5500 },
+        { name: "epic",       label: "Epic",       min: 500_000_000,   color: "#ff6b35", weight: 5,  atk: 820,  def: 700,  hp: 4800 },
+        { name: "super-rare", label: "Super Rare", min: 100_000_000,   color: "#c24eff", weight: 8,  atk: 720,  def: 600,  hp: 4200 },
+        { name: "rare",       label: "Rare",       min: 10_000_000,    color: "#4a9eff", weight: 18, atk: 520,  def: 440,  hp: 3000 },
+        { name: "uncommon",   label: "Uncommon",   min: 1_000_000,     color: "#4ec94e", weight: 30, atk: 350,  def: 300,  hp: 2100 },
+        { name: "common",     label: "Common",     min: 0,             color: "#8899aa", weight: 35, atk: 200,  def: 170,  hp: 1400 },
     ];
 
     // Elemental stat profiles per category
@@ -192,23 +194,25 @@
 
             if (difficulty === 1) {
                 // Easy: mostly common/uncommon
-                if (roll < 40) targetTier = "common";
-                else if (roll < 80) targetTier = "uncommon";
-                else if (roll < 95) targetTier = "rare";
+                if (roll < 35) targetTier = "common";
+                else if (roll < 70) targetTier = "uncommon";
+                else if (roll < 90) targetTier = "rare";
                 else targetTier = "super-rare";
             } else if (difficulty === 2) {
                 // Medium: uncommon/rare focused
-                if (roll < 15) targetTier = "common";
-                else if (roll < 40) targetTier = "uncommon";
-                else if (roll < 75) targetTier = "rare";
-                else if (roll < 95) targetTier = "super-rare";
+                if (roll < 10) targetTier = "common";
+                else if (roll < 30) targetTier = "uncommon";
+                else if (roll < 55) targetTier = "rare";
+                else if (roll < 80) targetTier = "super-rare";
+                else if (roll < 92) targetTier = "epic";
                 else targetTier = "legendary";
             } else {
-                // Hard: rare+ focused
-                if (roll < 5) targetTier = "uncommon";
-                else if (roll < 30) targetTier = "rare";
-                else if (roll < 70) targetTier = "super-rare";
-                else targetTier = "legendary";
+                // Hard: epic/legendary/mythic focused
+                if (roll < 5) targetTier = "rare";
+                else if (roll < 25) targetTier = "super-rare";
+                else if (roll < 50) targetTier = "epic";
+                else if (roll < 80) targetTier = "legendary";
+                else targetTier = "mythic";
             }
 
             const pool = VIDEO_DATABASE.filter(v => getRarity(v).name === targetTier);
@@ -227,7 +231,7 @@
 
     // --- Rarity stars ---
     function rarityStars(rarity) {
-        const starMap = { "common": 1, "uncommon": 2, "rare": 3, "super-rare": 4, "legendary": 5 };
+        const starMap = { "common": 1, "uncommon": 2, "rare": 3, "super-rare": 4, "epic": 5, "legendary": 6, "mythic": 7 };
         const count = starMap[rarity.name] || 1;
         return '<span class="card-stars">' + "&#9733;".repeat(count) + "</span>";
     }
@@ -252,7 +256,7 @@
 
         card.innerHTML = `
             <div class="card-frame">
-                ${rarity.name === "legendary" || rarity.name === "super-rare" ? '<div class="card-holo-overlay"></div>' : ""}
+                ${["mythic","legendary","super-rare","epic"].includes(rarity.name) ? '<div class="card-holo-overlay"></div>' : ""}
                 ${isNew ? '<div class="new-indicator">NEW</div>' : ""}
                 ${isDuplicate && entry ? `<div class="duplicate-badge">&times;${entry.count}</div>` : ""}
                 ${selected ? '<div class="selected-indicator">&#10003;</div>' : ""}
@@ -316,7 +320,7 @@
         card.className = `battle-card rarity-${rarity.name}`;
         card.innerHTML = `
             <div class="card-frame">
-                ${rarity.name === "legendary" || rarity.name === "super-rare" ? '<div class="card-holo-overlay"></div>' : ""}
+                ${["mythic","legendary","super-rare","epic"].includes(rarity.name) ? '<div class="card-holo-overlay"></div>' : ""}
                 <div class="card-header">
                     <span class="card-name">${escapeHtml(video.title)}</span>
                     <span class="card-hp-badge">HP ${stats.hp}</span>
@@ -362,7 +366,7 @@
         content.innerHTML = `
             <div class="modal-card-display rarity-${rarity.name}">
                 <div class="card-frame modal-frame">
-                    ${rarity.name === "legendary" || rarity.name === "super-rare" ? '<div class="card-holo-overlay"></div>' : ""}
+                    ${["mythic","legendary","super-rare","epic"].includes(rarity.name) ? '<div class="card-holo-overlay"></div>' : ""}
                     <div class="card-header">
                         <span class="card-name">${escapeHtml(video.title)}</span>
                         <span class="card-hp-badge">HP ${stats.hp}</span>
@@ -1345,8 +1349,10 @@
             }
         });
 
+        document.getElementById("stat-mythic").textContent = rarityCounts["mythic"] || 0;
         document.getElementById("stat-legendary").textContent = rarityCounts["legendary"];
         document.getElementById("stat-super-rare").textContent = rarityCounts["super-rare"];
+        document.getElementById("stat-epic").textContent = rarityCounts["epic"] || 0;
         document.getElementById("stat-rare").textContent = rarityCounts["rare"];
 
         // Rarity bars

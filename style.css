@@ -16,7 +16,9 @@
     --uncommon: #4ec94e;
     --rare: #4a9eff;
     --super-rare: #c24eff;
+    --epic: #ff6b35;
     --legendary: #ffb628;
+    --mythic: #ff44cc;
     --radius: 12px;
 }
 
@@ -242,10 +244,26 @@ nav { display: flex; gap: 4px; }
     box-shadow: 0 0 18px rgba(194,78,255,0.25);
     background: linear-gradient(145deg, #201430 0%, #14141f 100%);
 }
+.rarity-epic .card-frame {
+    border-color: #e85d2a;
+    box-shadow: 0 0 22px rgba(255,107,53,0.3), inset 0 0 20px rgba(255,107,53,0.04);
+    background: linear-gradient(145deg, #2a1810 0%, #1a0d08 50%, #14141f 100%);
+}
 .rarity-legendary .card-frame {
     border-color: #e8a820;
     box-shadow: 0 0 25px rgba(255,182,40,0.3), inset 0 0 30px rgba(255,182,40,0.05);
     background: linear-gradient(145deg, #2a2010 0%, #1a1508 50%, #14141f 100%);
+}
+.rarity-mythic .card-frame {
+    border-color: #ff44cc;
+    box-shadow: 0 0 30px rgba(255,68,204,0.35), 0 0 60px rgba(255,68,204,0.15), inset 0 0 40px rgba(255,68,204,0.06);
+    background: linear-gradient(145deg, #2a1028 0%, #1a0820 50%, #14141f 100%);
+    animation: mythicPulse 3s ease-in-out infinite;
+}
+
+@keyframes mythicPulse {
+    0%, 100% { box-shadow: 0 0 30px rgba(255,68,204,0.35), 0 0 60px rgba(255,68,204,0.15); }
+    50% { box-shadow: 0 0 40px rgba(255,68,204,0.5), 0 0 80px rgba(255,68,204,0.25), 0 0 120px rgba(255,68,204,0.1); }
 }
 
 /* Holographic overlay for rare+ */
@@ -271,6 +289,47 @@ nav { display: flex; gap: 4px; }
 @keyframes holoShift {
     0%, 100% { opacity: 0.6; filter: hue-rotate(0deg); }
     50% { opacity: 1; filter: hue-rotate(30deg); }
+}
+
+/* Mythic gets a faster, more vivid rainbow holo */
+.rarity-mythic .card-holo-overlay {
+    background: linear-gradient(
+        125deg,
+        rgba(255,0,100,0.08) 0%,
+        rgba(255,200,0,0.06) 15%,
+        rgba(0,255,100,0.06) 30%,
+        rgba(0,150,255,0.08) 45%,
+        rgba(180,0,255,0.08) 60%,
+        rgba(255,0,150,0.06) 75%,
+        rgba(255,200,100,0.06) 90%,
+        transparent 100%
+    );
+    animation: mythicHolo 2s ease-in-out infinite;
+}
+
+@keyframes mythicHolo {
+    0%, 100% { opacity: 0.8; filter: hue-rotate(0deg); }
+    33% { opacity: 1; filter: hue-rotate(60deg); }
+    66% { opacity: 0.9; filter: hue-rotate(120deg); }
+}
+
+/* Epic gets a warm fire holo */
+.rarity-epic .card-holo-overlay {
+    background: linear-gradient(
+        125deg,
+        transparent 0%,
+        rgba(255,100,30,0.06) 25%,
+        rgba(255,180,40,0.05) 40%,
+        transparent 55%,
+        rgba(255,80,20,0.06) 70%,
+        transparent 100%
+    );
+    animation: epicHolo 3s ease-in-out infinite;
+}
+
+@keyframes epicHolo {
+    0%, 100% { opacity: 0.5; filter: hue-rotate(0deg); }
+    50% { opacity: 1; filter: hue-rotate(15deg); }
 }
 
 /* Card Header — name + HP */
@@ -445,7 +504,9 @@ nav { display: flex; gap: 4px; }
 .rarity-uncommon .card-stars { color: var(--uncommon); }
 .rarity-rare .card-stars { color: var(--rare); }
 .rarity-super-rare .card-stars { color: var(--super-rare); }
+.rarity-epic .card-stars { color: var(--epic); }
 .rarity-legendary .card-stars { color: var(--legendary); }
+.rarity-mythic .card-stars { color: var(--mythic); text-shadow: 0 0 8px rgba(255,68,204,0.5); }
 
 .rarity-badge {
     font-size: 0.55rem;
@@ -460,7 +521,9 @@ nav { display: flex; gap: 4px; }
 .rarity-badge.uncommon { background: rgba(78,201,78,0.12); color: var(--uncommon); }
 .rarity-badge.rare { background: rgba(74,158,255,0.12); color: var(--rare); }
 .rarity-badge.super-rare { background: rgba(194,78,255,0.12); color: var(--super-rare); }
+.rarity-badge.epic { background: rgba(255,107,53,0.15); color: var(--epic); }
 .rarity-badge.legendary { background: rgba(255,182,40,0.15); color: var(--legendary); }
+.rarity-badge.mythic { background: rgba(255,68,204,0.15); color: var(--mythic); }
 
 /* Badges */
 .duplicate-badge {

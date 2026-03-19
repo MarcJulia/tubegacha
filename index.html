@@ -51,7 +51,9 @@
                     <h2>My Collection</h2>
                     <div class="filter-bar">
                         <button class="filter-btn active" data-rarity="all">All</button>
+                        <button class="filter-btn" data-rarity="mythic">Mythic</button>
                         <button class="filter-btn" data-rarity="legendary">Legendary</button>
+                        <button class="filter-btn" data-rarity="epic">Epic</button>
                         <button class="filter-btn" data-rarity="super-rare">Super Rare</button>
                         <button class="filter-btn" data-rarity="rare">Rare</button>
                         <button class="filter-btn" data-rarity="uncommon">Uncommon</button>
@@ -329,8 +331,16 @@
                         <div class="stat-label">Unique Cards</div>
                     </div>
                     <div class="stat-card">
+                        <div class="stat-value" id="stat-mythic">0</div>
+                        <div class="stat-label">Mythic</div>
+                    </div>
+                    <div class="stat-card">
                         <div class="stat-value" id="stat-legendary">0</div>
                         <div class="stat-label">Legendary</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-epic">0</div>
+                        <div class="stat-label">Epic</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="stat-super-rare">0</div>

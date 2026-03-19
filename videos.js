@@ -3,28 +3,38 @@
 // Rarity is calculated from view count at runtime
 
 const VIDEO_DATABASE = [
-    // === LEGENDARY (1B+ views) ===
-    { id: "dQw4w9WgXcQ", title: "Rick Astley - Never Gonna Give You Up", channel: "Rick Astley", views: 1500000000, category: "Music", description: "The official video for Rick Astley's iconic 1987 hit." },
+    // === MYTHIC (5B+ views) ===
+    { id: "kJQP7kiw5Fk", title: "Luis Fonsi - Despacito ft. Daddy Yankee", channel: "Luis Fonsi", views: 8300000000, category: "Music", description: "One of the most-viewed videos in YouTube history. A true Mythic." },
+    { id: "JGwWNGJdvx8", title: "Ed Sheeran - Shape of You", channel: "Ed Sheeran", views: 6200000000, category: "Music", description: "Ed Sheeran's massive pop hit. Over 6 billion views." },
+    { id: "RgKAFK5djSk", title: "Wiz Khalifa - See You Again ft. Charlie Puth", channel: "Wiz Khalifa", views: 6100000000, category: "Music", description: "Tribute to Paul Walker from Furious 7. Briefly held the #1 spot." },
+    { id: "OPf0YbXqDm0", title: "Mark Ronson - Uptown Funk ft. Bruno Mars", channel: "Mark Ronson", views: 5100000000, category: "Music", description: "The funk anthem that dominated 2015. 14 weeks at #1." },
     { id: "9bZkp7q19f0", title: "PSY - GANGNAM STYLE", channel: "officialpsy", views: 5000000000, category: "Music", description: "The global phenomenon that broke YouTube's view counter." },
-    { id: "kJQP7kiw5Fk", title: "Luis Fonsi - Despacito ft. Daddy Yankee", channel: "Luis Fonsi", views: 8300000000, category: "Music", description: "One of the most-viewed videos in YouTube history." },
-    { id: "JGwWNGJdvx8", title: "Ed Sheeran - Shape of You", channel: "Ed Sheeran", views: 6200000000, category: "Music", description: "Ed Sheeran's massive pop hit from 2017." },
-    { id: "RgKAFK5djSk", title: "Wiz Khalifa - See You Again ft. Charlie Puth", channel: "Wiz Khalifa", views: 6100000000, category: "Music", description: "Tribute to Paul Walker from Furious 7." },
-    { id: "OPf0YbXqDm0", title: "Mark Ronson - Uptown Funk ft. Bruno Mars", channel: "Mark Ronson", views: 5000000000, category: "Music", description: "The funk anthem that dominated 2015." },
+
+    // === LEGENDARY (1B-5B views) ===
+    { id: "dQw4w9WgXcQ", title: "Rick Astley - Never Gonna Give You Up", channel: "Rick Astley", views: 1500000000, category: "Music", description: "The official video for Rick Astley's iconic 1987 hit." },
     { id: "60ItHLz5WEA", title: "Alan Walker - Faded", channel: "Alan Walker", views: 3700000000, category: "Music", description: "The Norwegian producer's breakout EDM hit." },
     { id: "YqeW9_5kURI", title: "Major Lazer - Lean On ft. MO", channel: "Major Lazer", views: 3500000000, category: "Music", description: "A genre-blending dance hit." },
+    { id: "lp-EO5I60KA", title: "Eminem - Love The Way You Lie ft. Rihanna", channel: "Eminem", views: 2400000000, category: "Music", description: "The explosive collaboration that defined 2010." },
+    { id: "HP-MbfHFUqs", title: "Taylor Swift - Shake It Off", channel: "Taylor Swift", views: 3500000000, category: "Music", description: "Taylor's pop reinvention anthem." },
+    { id: "pRpeEdMmmQ0", title: "Shakira - Waka Waka", channel: "Shakira", views: 3600000000, category: "Music", description: "The 2010 FIFA World Cup official song." },
 
-    // === SUPER RARE (100M-1B views) ===
-    { id: "hY7m5jjJ9mM", title: "Cooking The Perfect Steak", channel: "Gordon Ramsay", views: 450000000, category: "Food", description: "Gordon Ramsay demonstrates how to cook the perfect steak at home." },
+    // === EPIC (500M-1B views) ===
+    { id: "YbJOTdZBX1g", title: "Charlie Bit My Finger", channel: "HDCYT", views: 900000000, category: "Comedy", description: "The classic viral video of two brothers that defined early YouTube." },
+    { id: "FTQbiNvZqaY", title: "Toto - Africa", channel: "Toto", views: 800000000, category: "Music", description: "The 1982 classic that became a meme and a timeless hit." },
+    { id: "fJ9rUzIMcZQ", title: "Queen - Bohemian Rhapsody", channel: "Queen Official", views: 500000000, category: "Music", description: "The legendary six-minute epic from 1975." },
+    { id: "hY7m5jjJ9mM", title: "Cooking The Perfect Steak", channel: "Gordon Ramsay", views: 550000000, category: "Food", description: "Gordon Ramsay demonstrates how to cook the perfect steak at home." },
+    { id: "e-ORhEE9VVg", title: "Taylor Swift - Blank Space", channel: "Taylor Swift", views: 800000000, category: "Music", description: "The satirical pop masterpiece from 1989." },
+    { id: "YQHsXMglC9A", title: "Adele - Hello", channel: "Adele", views: 700000000, category: "Music", description: "Adele's record-breaking comeback single." },
+
+    // === SUPER RARE (100M-500M views) ===
+    { id: "hT_nvWreIhg", title: "OneRepublic - Counting Stars", channel: "OneRepublic", views: 400000000, category: "Music", description: "Hit single from the album Native." },
     { id: "dqTTojTija8", title: "HUMANS Need Not Apply", channel: "CGP Grey", views: 200000000, category: "Education", description: "A thought-provoking look at automation and the future of work." },
     { id: "aircAruvnKk", title: "How to make mass-energy equivalence", channel: "3Blue1Brown", views: 150000000, category: "Education", description: "An elegant mathematical explanation of E=mc2." },
-    { id: "YbJOTdZBX1g", title: "Charlie Bit My Finger", channel: "HDCYT", views: 900000000, category: "Comedy", description: "The classic viral video of two brothers." },
-    { id: "hT_nvWreIhg", title: "OneRepublic - Counting Stars", channel: "OneRepublic", views: 400000000, category: "Music", description: "Hit single from the album Native." },
-    { id: "fJ9rUzIMcZQ", title: "Queen - Bohemian Rhapsody", channel: "Queen Official", views: 500000000, category: "Music", description: "The legendary six-minute epic from 1975." },
     { id: "ktvTqknDobU", title: "Imagine Dragons - Radioactive", channel: "Imagine Dragons", views: 350000000, category: "Music", description: "The rock anthem that defined early 2010s alternative." },
-    { id: "FTQbiNvZqaY", title: "Toto - Africa", channel: "Toto", views: 800000000, category: "Music", description: "The 1982 classic that became a meme and a timeless hit." },
     { id: "ZZ5LpwO-An4", title: "HEYYEYAAEYAAAEYAEYAA", channel: "Fabulous Secret Powers", views: 200000000, category: "Comedy", description: "He-Man sings a beloved meme." },
     { id: "GI_P3UtZXAA", title: "Keyboard Cat", channel: "Charlie Schmidt", views: 150000000, category: "Comedy", description: "The original keyboard-playing cat that launched a meme empire." },
     { id: "QH2-TGUlwu4", title: "Nyan Cat", channel: "Nyan Cat", views: 200000000, category: "Comedy", description: "10 hours of the rainbow pop-tart cat." },
+    { id: "450p7goxZqg", title: "Mark Rober - Glitter Bomb Trap", channel: "Mark Rober", views: 300000000, category: "Tech", description: "The viral porch pirate revenge video with engineering genius." },
 
     // === RARE (10M-100M views) ===
     { id: "rE3j_RHkqJc", title: "Water - Pair of Kings Explained", channel: "Lemmino", views: 30000000, category: "Education", description: "A deep dive into one of history's greatest mysteries." },
