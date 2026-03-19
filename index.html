@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TubeGacha — Collect YouTube Videos as Cards</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1 class="logo">Tube<span>Gacha</span></h1>
+            <nav>
+                <button class="nav-btn active" data-view="pack">Pack</button>
+                <button class="nav-btn" data-view="collection">Collection</button>
+                <button class="nav-btn" data-view="raid">Raid</button>
+                <button class="nav-btn" data-view="arena">Arena</button>
+                <button class="nav-btn" data-view="top10">Top 10</button>
+                <button class="nav-btn" data-view="stats">Stats</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Pack Opening View -->
+            <section id="view-pack" class="view active">
+                <div class="pack-info">
+                    <p class="packs-remaining">Packs today: <span id="packs-left">3</span>/3</p>
+                </div>
+                <div id="pack-container">
+                    <div id="pack" class="pack-idle">
+                        <div class="pack-front">
+                            <div class="pack-glow"></div>
+                            <div class="pack-label">
+                                <span class="pack-icon">&#9654;</span>
+                                <span class="pack-text">TAP TO OPEN</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="card-reveal" class="hidden">
+                    <div id="revealed-cards"></div>
+                    <button id="collect-btn" class="btn-primary">Collect All</button>
+                </div>
+            </section>
+
+            <!-- Collection View -->
+            <section id="view-collection" class="view">
+                <div class="collection-header">
+                    <h2>My Collection</h2>
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-rarity="all">All</button>
+                        <button class="filter-btn" data-rarity="legendary">Legendary</button>
+                        <button class="filter-btn" data-rarity="super-rare">Super Rare</button>
+                        <button class="filter-btn" data-rarity="rare">Rare</button>
+                        <button class="filter-btn" data-rarity="uncommon">Uncommon</button>
+                        <button class="filter-btn" data-rarity="common">Common</button>
+                    </div>
+                </div>
+                <div id="collection-grid" class="card-grid"></div>
+                <p id="empty-collection" class="empty-msg hidden">No cards yet! Open some packs to start collecting.</p>
+            </section>
+
+            <!-- Raid View -->
+            <section id="view-raid" class="view">
+                <!-- Phase 0: Raid lobby -->
+                <div id="raid-lobby">
+                    <div class="raid-header">
+                        <h2>Raid Battle</h2>
+                        <p class="raids-remaining">Raids today: <span id="raids-left">2</span>/2</p>
+                    </div>
+                    <p class="raid-desc">Challenge other collectors! Pick an opponent, choose your 3 best cards, and battle to steal from their collection.</p>
+
+                    <h3 class="raid-subtitle">Choose Your Opponent</h3>
+                    <div id="opponent-list" class="opponent-list"></div>
+
+                    <p id="raid-need-cards" class="empty-msg hidden">You need at least 3 cards to raid. Open some packs first!</p>
+                </div>
+
+                <!-- Phase 1: Card selection -->
+                <div id="raid-select" class="hidden">
+                    <div class="raid-vs-header">
+                        <div class="raid-vs-player">
+                            <div class="raid-vs-name">YOU</div>
+                        </div>
+                        <div class="raid-vs-badge">VS</div>
+                        <div class="raid-vs-player">
+                            <div class="raid-vs-name" id="raid-opponent-name"></div>
+                        </div>
+                    </div>
+                    <h3 class="raid-subtitle">Select 3 Cards for Battle</h3>
+                    <p class="raid-select-hint">Tap cards to select. Consider type advantages!</p>
+                    <div class="type-chart-toggle">
+                        <button id="toggle-type-chart" class="btn-secondary">Show Type Chart</button>
+                    </div>
+                    <div id="type-chart" class="type-chart hidden">
+                        <div class="type-chart-title">Elemental Strengths (1.75x) &amp; Weaknesses (0.55x)</div>
+                        <div class="type-chart-grid">
+                            <div class="type-entry"><span class="type-label music">Sonic</span><span class="type-beats">&#9876; Comedy, Art</span></div>
+                            <div class="type-entry"><span class="type-label comedy">Chaos</span><span class="type-beats">&#9876; Education, Fitness</span></div>
+                            <div class="type-entry"><span class="type-label education">Wisdom</span><span class="type-beats">&#9876; Tech, Gaming</span></div>
+                            <div class="type-entry"><span class="type-label tech">Circuit</span><span class="type-beats">&#9876; Entertainment, Travel</span></div>
+                            <div class="type-entry"><span class="type-label entertainment">Spectacle</span><span class="type-beats">&#9876; Music, Food</span></div>
+                            <div class="type-entry"><span class="type-label food">Hearth</span><span class="type-beats">&#9876; Fitness, Travel</span></div>
+                            <div class="type-entry"><span class="type-label travel">Wanderer</span><span class="type-beats">&#9876; Art, Comedy</span></div>
+                            <div class="type-entry"><span class="type-label gaming">Pixel</span><span class="type-beats">&#9876; Entertainment, Music</span></div>
+                            <div class="type-entry"><span class="type-label fitness">Iron</span><span class="type-beats">&#9876; Tech, Gaming</span></div>
+                            <div class="type-entry"><span class="type-label art">Muse</span><span class="type-beats">&#9876; Education, Food</span></div>
+                        </div>
+                    </div>
+                    <div id="raid-select-grid" class="card-grid selectable-grid"></div>
+                    <div class="raid-selected-bar">
+                        <div id="raid-selected-slots" class="selected-slots">
+                            <div class="selected-slot empty" data-slot="0">1</div>
+                            <div class="selected-slot empty" data-slot="1">2</div>
+                            <div class="selected-slot empty" data-slot="2">3</div>
+                        </div>
+                        <button id="raid-start-btn" class="btn-primary" disabled>Battle!</button>
+                    </div>
+                </div>
+
+                <!-- Phase 2: Battle arena -->
+                <div id="raid-battle" class="hidden">
+                    <div class="battle-scoreboard">
+                        <div class="battle-score-side">
+                            <span class="battle-score-name">YOU</span>
+                            <span class="battle-score-val" id="player-score">0</span>
+                        </div>
+                        <div class="battle-round-indicator">
+                            Round <span id="battle-round">1</span>/3
+                        </div>
+                        <div class="battle-score-side">
+                            <span class="battle-score-val" id="opponent-score">0</span>
+                            <span class="battle-score-name" id="battle-opp-name"></span>
+                        </div>
+                    </div>
+
+                    <div class="battle-arena">
+                        <div class="battle-card-side" id="battle-player-side">
+                            <div class="battle-card-wrapper" id="player-battle-card"></div>
+                            <div class="battle-hp-bar">
+                                <div class="hp-label">HP</div>
+                                <div class="hp-track"><div class="hp-fill player-hp" id="player-hp"></div></div>
+                                <div class="hp-value" id="player-hp-text">100</div>
+                            </div>
+                            <div class="battle-stats" id="player-battle-stats"></div>
+                        </div>
+
+                        <div class="battle-center">
+                            <div id="battle-action-text" class="battle-action-text">VS</div>
+                            <div id="battle-type-indicator" class="battle-type-indicator"></div>
+                        </div>
+
+                        <div class="battle-card-side" id="battle-opponent-side">
+                            <div class="battle-card-wrapper" id="opponent-battle-card"></div>
+                            <div class="battle-hp-bar">
+                                <div class="hp-label">HP</div>
+                                <div class="hp-track"><div class="hp-fill opponent-hp" id="opponent-hp"></div></div>
+                                <div class="hp-value" id="opponent-hp-text">100</div>
+                            </div>
+                            <div class="battle-stats" id="opponent-battle-stats"></div>
+                        </div>
+                    </div>
+
+                    <div id="battle-log" class="battle-log"></div>
+                </div>
+
+                <!-- Phase 3: Battle result -->
+                <div id="raid-result" class="hidden">
+                    <div id="result-banner" class="result-banner">
+                        <h2 id="result-title"></h2>
+                        <p id="result-subtitle"></p>
+                    </div>
+                    <div id="result-reward" class="result-reward hidden">
+                        <h3>Card Stolen!</h3>
+                        <div id="reward-card-container"></div>
+                    </div>
+                    <div class="result-summary">
+                        <h3>Battle Summary</h3>
+                        <div id="result-rounds"></div>
+                    </div>
+                    <button id="raid-back-btn" class="btn-primary">Back to Raid Lobby</button>
+                </div>
+            </section>
+
+            <!-- Arena View -->
+            <section id="view-arena" class="view">
+                <!-- Phase: lobby -->
+                <div id="arena-lobby">
+                    <div class="raid-header">
+                        <h2>Grid Arena</h2>
+                        <span class="arena-badge">Unlimited</span>
+                    </div>
+                    <p class="raid-desc">A 3-lane battlefield. See your opponent's formation, then place your cards to counter. Each lane fights independently — survivors deal breakthrough damage!</p>
+                    <h3 class="raid-subtitle">Choose Difficulty</h3>
+                    <div class="arena-diff-btns">
+                        <button class="arena-diff-btn" data-diff="1">Easy</button>
+                        <button class="arena-diff-btn" data-diff="2">Medium</button>
+                        <button class="arena-diff-btn" data-diff="3">Hard</button>
+                    </div>
+                    <p id="arena-need-cards" class="empty-msg hidden">You need at least 3 cards to enter the arena.</p>
+                </div>
+
+                <!-- Phase: placement -->
+                <div id="arena-placement" class="hidden">
+                    <h3 class="raid-subtitle">Enemy Formation — Place Your Cards to Counter!</h3>
+                    <div class="arena-grid">
+                        <div class="arena-lane-labels">
+                            <span>LEFT</span><span>CENTER</span><span>RIGHT</span>
+                        </div>
+                        <div class="arena-row enemy-row">
+                            <div class="arena-slot" id="arena-enemy-0"></div>
+                            <div class="arena-slot" id="arena-enemy-1"></div>
+                            <div class="arena-slot" id="arena-enemy-2"></div>
+                        </div>
+                        <div class="arena-vs-divider">
+                            <span>VS</span><span>VS</span><span>VS</span>
+                        </div>
+                        <div class="arena-row player-row">
+                            <div class="arena-slot arena-drop" id="arena-player-0" data-lane="0">
+                                <span class="drop-hint">Tap a card then tap here</span>
+                            </div>
+                            <div class="arena-slot arena-drop" id="arena-player-1" data-lane="1">
+                                <span class="drop-hint">Tap a card then tap here</span>
+                            </div>
+                            <div class="arena-slot arena-drop" id="arena-player-2" data-lane="2">
+                                <span class="drop-hint">Tap a card then tap here</span>
+                            </div>
+                        </div>
+                    </div>
+                    <h3 class="raid-subtitle">Your Cards</h3>
+                    <div id="arena-hand" class="card-grid selectable-grid"></div>
+                    <div class="arena-action-bar">
+                        <button id="arena-fight-btn" class="btn-primary" disabled>Fight!</button>
+                        <button id="arena-reset-btn" class="btn-secondary">Reset</button>
+                    </div>
+                </div>
+
+                <!-- Phase: battle -->
+                <div id="arena-battle" class="hidden">
+                    <div class="arena-battle-grid">
+                        <div class="arena-lane-labels">
+                            <span>LEFT</span><span>CENTER</span><span>RIGHT</span>
+                        </div>
+                        <div class="arena-row enemy-row">
+                            <div class="arena-battle-slot" id="arena-b-enemy-0"></div>
+                            <div class="arena-battle-slot" id="arena-b-enemy-1"></div>
+                            <div class="arena-battle-slot" id="arena-b-enemy-2"></div>
+                        </div>
+                        <div class="arena-hp-row">
+                            <div class="arena-lane-hp">
+                                <div class="hp-track"><div class="hp-fill" id="arena-ehp-0"></div></div>
+                                <span class="hp-value" id="arena-ehp-text-0"></span>
+                            </div>
+                            <div class="arena-lane-hp">
+                                <div class="hp-track"><div class="hp-fill" id="arena-ehp-1"></div></div>
+                                <span class="hp-value" id="arena-ehp-text-1"></span>
+                            </div>
+                            <div class="arena-lane-hp">
+                                <div class="hp-track"><div class="hp-fill" id="arena-ehp-2"></div></div>
+                                <span class="hp-value" id="arena-ehp-text-2"></span>
+                            </div>
+                        </div>
+                        <div class="arena-vs-divider battle-vs">
+                            <span id="arena-lane-status-0">VS</span>
+                            <span id="arena-lane-status-1">VS</span>
+                            <span id="arena-lane-status-2">VS</span>
+                        </div>
+                        <div class="arena-hp-row">
+                            <div class="arena-lane-hp">
+                                <div class="hp-track"><div class="hp-fill" id="arena-php-0"></div></div>
+                                <span class="hp-value" id="arena-php-text-0"></span>
+                            </div>
+                            <div class="arena-lane-hp">
+                                <div class="hp-track"><div class="hp-fill" id="arena-php-1"></div></div>
+                                <span class="hp-value" id="arena-php-text-1"></span>
+                            </div>
+                            <div class="arena-lane-hp">
+                                <div class="hp-track"><div class="hp-fill" id="arena-php-2"></div></div>
+                                <span class="hp-value" id="arena-php-text-2"></span>
+                            </div>
+                        </div>
+                        <div class="arena-row player-row">
+                            <div class="arena-battle-slot" id="arena-b-player-0"></div>
+                            <div class="arena-battle-slot" id="arena-b-player-1"></div>
+                            <div class="arena-battle-slot" id="arena-b-player-2"></div>
+                        </div>
+                    </div>
+                    <div id="arena-battle-log" class="battle-log"></div>
+                </div>
+
+                <!-- Phase: result -->
+                <div id="arena-result" class="hidden">
+                    <div id="arena-result-banner" class="result-banner">
+                        <h2 id="arena-result-title"></h2>
+                        <p id="arena-result-subtitle"></p>
+                    </div>
+                    <div class="result-summary">
+                        <h3>Lane Results</h3>
+                        <div id="arena-result-lanes"></div>
+                    </div>
+                    <button id="arena-again-btn" class="btn-primary">Play Again</button>
+                </div>
+            </section>
+
+            <!-- Top 10 View -->
+            <section id="view-top10" class="view">
+                <div class="top10-header">
+                    <h2>Top 10 YouTube Cards</h2>
+                    <p class="top10-desc">The most-viewed videos of all time — the ultimate legendary collection.</p>
+                </div>
+                <div id="top10-list" class="top10-list"></div>
+                <div class="top10-legend">
+                    <p>Ownership is shown for cards in your collection. Can you collect them all?</p>
+                </div>
+            </section>
+
+            <!-- Stats View -->
+            <section id="view-stats" class="view">
+                <h2>Stats</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">Total Cards</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-unique">0</div>
+                        <div class="stat-label">Unique Cards</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-legendary">0</div>
+                        <div class="stat-label">Legendary</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-super-rare">0</div>
+                        <div class="stat-label">Super Rare</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-rare">0</div>
+                        <div class="stat-label">Rare</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-packs">0</div>
+                        <div class="stat-label">Packs Opened</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-raids-won">0</div>
+                        <div class="stat-label">Raids Won</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-raids-lost">0</div>
+                        <div class="stat-label">Raids Lost</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-stolen">0</div>
+                        <div class="stat-label">Cards Stolen</div>
+                    </div>
+                </div>
+                <div class="rarity-breakdown">
+                    <h3>Rarity Distribution</h3>
+                    <div id="rarity-bars"></div>
+                </div>
+                <div class="battle-history" id="battle-history-section">
+                    <h3>Recent Battles</h3>
+                    <div id="battle-history-list"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Card Detail Modal -->
+        <div id="card-modal" class="modal hidden">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close">&times;</button>
+                <div id="modal-card"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="videos.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
