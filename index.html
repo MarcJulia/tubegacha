@@ -19,6 +19,7 @@
                 <button class="nav-btn" data-view="arena">Arena</button>
                 <button class="nav-btn" data-view="top10">Top 10</button>
                 <button class="nav-btn" data-view="stats">Stats</button>
+                <button class="nav-btn" data-view="settings">&#9881;</button>
             </nav>
         </header>
 
@@ -377,6 +378,20 @@
                 </div>
             </section>
         </main>
+
+            <!-- Settings View -->
+            <section id="view-settings" class="view">
+                <h2>Settings</h2>
+                <div class="settings-section">
+                    <h3>YouTube Data API Key</h3>
+                    <p class="settings-desc">Enter your API key to fetch real YouTube videos for the card pool. Get one free at <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a> — enable "YouTube Data API v3" and create an API key.</p>
+                    <div class="settings-input-row">
+                        <input type="text" id="api-key-input" placeholder="AIza..." class="settings-input">
+                        <button id="save-api-key" class="btn-primary">Save</button>
+                    </div>
+                    <p id="api-key-status" class="settings-status"></p>
+                </div>
+            </section>
 
         <!-- Card Detail Modal -->
         <div id="card-modal" class="modal hidden">

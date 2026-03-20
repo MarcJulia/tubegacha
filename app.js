@@ -1,4 +1,5 @@
 // TubeGacha - YouTube Video Card Collector with Raid Battles
+// Migrated to server/SQLite backend via videos.js API helpers
 
 (function () {
     "use strict";
@@ -7,7 +8,6 @@
     const PACKS_PER_DAY = 3;
     const CARDS_PER_PACK = 3;
     const RAIDS_PER_DAY = 2;
-    const STORAGE_KEY = "tubegacha_data";
     const BATTLE_ROUNDS = 3;
 
     // Rarity tiers with base combat stats (big numbers)
@@ -22,7 +22,6 @@
     ];
 
     // Elemental stat profiles per category
-    // Each type leans into different strengths: ATK%, DEF%, HP%
     const ELEMENT_PROFILES = {
         "Music":         { atkMul: 1.25, defMul: 0.90, hpMul: 0.95, element: "Sonic" },
         "Comedy":        { atkMul: 1.10, defMul: 0.85, hpMul: 1.15, element: "Chaos" },
@@ -36,13 +35,24 @@
         "Art":           { atkMul: 1.00, defMul: 1.00, hpMul: 1.15, element: "Muse" },
     };
 
-    // --- State ---
-    let state = loadState();
+    // --- State (populated async from server in init) ---
+    let state = {
+        collection: [],
+        packsLeft: PACKS_PER_DAY,
+        raidsLeft: RAIDS_PER_DAY,
+        lastPackDay: getTodayKey(),
+        totalPacksOpened: 0,
+        raidsWon: 0,
+        raidsLost: 0,
+        cardsStolen: 0,
+        battleHistory: [],
+    };
+
     let raidState = {
         selectedCards: [],
         opponent: null,
         opponentCards: [],
-        phase: "lobby", // lobby, select, battle, result
+        phase: "lobby",
     };
 
     // --- Helpers ---
@@ -57,13 +67,11 @@
         const rarity = getRarity(video);
         const profile = ELEMENT_PROFILES[video.category] || { atkMul: 1, defMul: 1, hpMul: 1, element: "Neutral" };
 
-        // View-based variance: how far into the tier (0-1), adds up to +150 ATK/DEF, +500 HP
         const tierRange = rarity.min === 0 ? 1_000_000 : rarity.min * 9;
         const viewsInTier = Math.min(video.views - rarity.min, tierRange);
         const tierProgress = viewsInTier / tierRange;
         const variance = Math.floor(tierProgress * 150);
 
-        // Apply elemental multipliers to base + variance
         const rawAtk = rarity.atk + variance;
         const rawDef = rarity.def + Math.floor(variance * 0.8);
         const rawHp = rarity.hp + variance * 4;
@@ -83,9 +91,9 @@
         const strong = advantages.includes(defenderCat);
         const weak = defAdv.includes(attackerCat);
 
-        if (strong && weak) return 1.0; // Mutual — cancels out
-        if (strong) return 1.75; // Super effective
-        if (weak) return 0.55;   // Resisted
+        if (strong && weak) return 1.0;
+        if (strong) return 1.75;
+        if (weak) return 0.55;
         return 1.0;
     }
 
@@ -107,44 +115,77 @@
         return new Date().toISOString().slice(0, 10);
     }
 
-    function loadState() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed.lastPackDay !== getTodayKey()) {
-                    parsed.packsLeft = PACKS_PER_DAY;
-                    parsed.raidsLeft = RAIDS_PER_DAY;
-                    parsed.lastPackDay = getTodayKey();
-                }
-                // Migrate old state
-                if (parsed.raidsLeft === undefined) parsed.raidsLeft = RAIDS_PER_DAY;
-                if (!parsed.raidsWon) parsed.raidsWon = 0;
-                if (!parsed.raidsLost) parsed.raidsLost = 0;
-                if (!parsed.cardsStolen) parsed.cardsStolen = 0;
-                if (!parsed.battleHistory) parsed.battleHistory = [];
-                return parsed;
-            }
-        } catch (e) { /* ignore */ }
-        return {
-            collection: [],
-            packsLeft: PACKS_PER_DAY,
-            raidsLeft: RAIDS_PER_DAY,
-            lastPackDay: getTodayKey(),
-            totalPacksOpened: 0,
-            raidsWon: 0,
-            raidsLost: 0,
-            cardsStolen: 0,
-            battleHistory: [],
-        };
+    // --- Server-backed state loading ---
+    async function loadStateFromServer() {
+        const [collection, battleHistory, packsLeftVal, raidsLeftVal, lastPackDayVal, totalPacksVal, raidsWonVal, raidsLostVal, cardsStolenVal] = await Promise.all([
+            loadCollection(),
+            loadBattleHistory(),
+            loadGameState("packsLeft"),
+            loadGameState("raidsLeft"),
+            loadGameState("lastPackDay"),
+            loadGameState("totalPacksOpened"),
+            loadGameState("raidsWon"),
+            loadGameState("raidsLost"),
+            loadGameState("cardsStolen"),
+        ]);
+
+        const today = getTodayKey();
+        const lastDay = lastPackDayVal || today;
+        const isNewDay = lastDay !== today;
+
+        state.collection = collection;
+        state.battleHistory = battleHistory;
+        state.packsLeft = isNewDay ? PACKS_PER_DAY : (packsLeftVal ?? PACKS_PER_DAY);
+        state.raidsLeft = isNewDay ? RAIDS_PER_DAY : (raidsLeftVal ?? RAIDS_PER_DAY);
+        state.lastPackDay = today;
+        state.totalPacksOpened = totalPacksVal || 0;
+        state.raidsWon = raidsWonVal || 0;
+        state.raidsLost = raidsLostVal || 0;
+        state.cardsStolen = cardsStolenVal || 0;
+
+        if (isNewDay) {
+            await saveGameState("lastPackDay", today);
+            await saveGameState("packsLeft", PACKS_PER_DAY);
+            await saveGameState("raidsLeft", RAIDS_PER_DAY);
+        }
     }
 
-    function saveState() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    async function savePacksLeft() {
+        await saveGameState("packsLeft", state.packsLeft);
+    }
+
+    async function saveRaidsLeft() {
+        await saveGameState("raidsLeft", state.raidsLeft);
+    }
+
+    async function saveStatsToServer() {
+        await Promise.all([
+            saveGameState("totalPacksOpened", state.totalPacksOpened),
+            saveGameState("raidsWon", state.raidsWon),
+            saveGameState("raidsLost", state.raidsLost),
+            saveGameState("cardsStolen", state.cardsStolen),
+        ]);
+    }
+
+    async function addToServerCollection(video) {
+        await addCardToCollection(video);
+    }
+
+    async function addBattleToServer(opponent, won, score, mode) {
+        await saveBattle(opponent, won, score, mode);
     }
 
     function getVideoById(videoId) {
-        return VIDEO_DATABASE.find(v => v.id === videoId);
+        const entry = state.collection.find(c => c.videoId === videoId);
+        if (!entry) return null;
+        return {
+            id: entry.videoId,
+            title: entry.title,
+            channel: entry.channel,
+            views: entry.views,
+            category: entry.category,
+            description: entry.description || "",
+        };
     }
 
     function getCollectionEntry(videoId) {
@@ -160,73 +201,26 @@
     }
 
     // --- Gacha Logic ---
-    function rollCards(count) {
-        const cards = [];
-        for (let i = 0; i < count; i++) {
-            const roll = Math.random() * 100;
-            let cumulative = 0;
-            let targetTier = RARITY_TIERS[RARITY_TIERS.length - 1];
-
-            for (const tier of RARITY_TIERS) {
-                cumulative += tier.weight;
-                if (roll < cumulative) {
-                    targetTier = tier;
-                    break;
-                }
-            }
-
-            const pool = VIDEO_DATABASE.filter(v => getRarity(v).name === targetTier.name);
-            if (pool.length > 0) {
-                cards.push(pool[Math.floor(Math.random() * pool.length)]);
-            } else {
-                cards.push(VIDEO_DATABASE[Math.floor(Math.random() * VIDEO_DATABASE.length)]);
-            }
-        }
-        return cards;
+    // Fetches fresh videos from YouTube via server
+    async function rollCards(count) {
+        const result = await pullCards(count);
+        if (result.error) throw new Error(result.error);
+        return result;
     }
 
-    // --- AI Opponent Generation ---
-    function generateOpponentDeck(difficulty) {
-        const deck = [];
-        for (let i = 0; i < 3; i++) {
-            let targetTier;
-            const roll = Math.random() * 100;
-
-            if (difficulty === 1) {
-                // Easy: mostly common/uncommon
-                if (roll < 35) targetTier = "common";
-                else if (roll < 70) targetTier = "uncommon";
-                else if (roll < 90) targetTier = "rare";
-                else targetTier = "super-rare";
-            } else if (difficulty === 2) {
-                // Medium: uncommon/rare focused
-                if (roll < 10) targetTier = "common";
-                else if (roll < 30) targetTier = "uncommon";
-                else if (roll < 55) targetTier = "rare";
-                else if (roll < 80) targetTier = "super-rare";
-                else if (roll < 92) targetTier = "epic";
-                else targetTier = "legendary";
-            } else {
-                // Hard: epic/legendary/mythic focused
-                if (roll < 5) targetTier = "rare";
-                else if (roll < 25) targetTier = "super-rare";
-                else if (roll < 50) targetTier = "epic";
-                else if (roll < 80) targetTier = "legendary";
-                else targetTier = "mythic";
-            }
-
-            const pool = VIDEO_DATABASE.filter(v => getRarity(v).name === targetTier);
-            if (pool.length > 0) {
-                // Avoid duplicates in deck
-                const available = pool.filter(v => !deck.find(d => d.id === v.id));
-                if (available.length > 0) {
-                    deck.push(available[Math.floor(Math.random() * available.length)]);
-                } else {
-                    deck.push(pool[Math.floor(Math.random() * pool.length)]);
-                }
-            }
-        }
-        return deck;
+    // --- AI Opponent Deck ---
+    // Picks 3 random cards from the player's collection as opponent cards
+    function generateOpponentDeck() {
+        const pool = state.collection.map(e => ({
+            id: e.videoId,
+            title: e.title,
+            channel: e.channel,
+            views: e.views,
+            category: e.category,
+            description: e.description || "",
+        }));
+        const shuffled = pool.sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, 3);
     }
 
     // --- Rarity stars ---
@@ -427,7 +421,7 @@
     }
 
     // --- Pack Opening ---
-    function openPack() {
+    async function openPack() {
         if (state.packsLeft <= 0) return;
 
         const pack = document.getElementById("pack");
@@ -437,53 +431,65 @@
 
         pack.className = "opening";
 
-        setTimeout(() => {
-            pack.className = "opened";
+        // Fetch cards from YouTube while animation plays
+        let cards;
+        try {
+            cards = await rollCards(CARDS_PER_PACK);
+        } catch (err) {
+            pack.className = "pack-idle";
+            alert("Failed to pull cards: " + err.message);
+            return;
+        }
 
-            setTimeout(() => {
-                container.style.display = "none";
-                reveal.classList.remove("hidden");
+        pack.className = "opened";
+        await sleep(400);
 
-                const cards = rollCards(CARDS_PER_PACK);
-                revealedCards.innerHTML = "";
+        container.style.display = "none";
+        reveal.classList.remove("hidden");
+        revealedCards.innerHTML = "";
 
-                cards.forEach((video) => {
-                    const existing = getCollectionEntry(video.id);
-                    const isNew = !existing;
-                    const card = createCardElement(video, {
-                        isNew,
-                        isDuplicate: !isNew,
-                        revealClass: "card-reveal-item",
-                        showStats: true,
-                    });
-                    revealedCards.appendChild(card);
-                });
+        cards.forEach((video) => {
+            const existing = getCollectionEntry(video.id);
+            const isNew = !existing;
+            const card = createCardElement(video, {
+                isNew,
+                isDuplicate: !isNew,
+                revealClass: "card-reveal-item",
+                showStats: true,
+            });
+            revealedCards.appendChild(card);
+        });
 
-                window._pendingCards = cards;
-            }, 400);
-        }, 600);
+        window._pendingCards = cards;
     }
 
-    function collectCards() {
+    async function collectCards() {
         const cards = window._pendingCards;
         if (!cards) return;
 
-        cards.forEach((video) => {
+        for (const video of cards) {
             const entry = getCollectionEntry(video.id);
             if (entry) {
                 entry.count++;
             } else {
                 state.collection.push({
                     videoId: video.id,
+                    title: video.title,
+                    channel: video.channel,
+                    views: video.views,
+                    category: video.category,
+                    description: video.description || "",
                     obtainedAt: new Date().toISOString(),
                     count: 1,
                 });
             }
-        });
+            await addToServerCollection(video);
+        }
 
         state.packsLeft--;
         state.totalPacksOpened++;
-        saveState();
+        await Promise.all([savePacksLeft(), saveStatsToServer()]);
+
         window._pendingCards = null;
         resetPackUI();
     }
@@ -624,7 +630,6 @@
         list.style.display = "grid";
         list.innerHTML = "";
 
-        // Show 4 random opponents
         const shuffled = [...AI_OPPONENTS].sort(() => Math.random() - 0.5);
         const shown = shuffled.slice(0, 4);
 
@@ -667,7 +672,7 @@
     function startRaidSelect(opponent) {
         raidState.opponent = opponent;
         raidState.selectedCards = [];
-        raidState.opponentCards = generateOpponentDeck(opponent.difficulty);
+        raidState.opponentCards = generateOpponentDeck();
 
         document.getElementById("raid-opponent-name").textContent = opponent.name;
         showRaidPhase("select");
@@ -680,7 +685,6 @@
         const grid = document.getElementById("raid-select-grid");
         grid.innerHTML = "";
 
-        // Show all collection cards sorted by power
         const entries = [...state.collection].sort((a, b) => {
             const va = getVideoById(a.videoId);
             const vb = getVideoById(b.videoId);
@@ -758,7 +762,6 @@
             const pStats = getCardStats(pVideo);
             const oStats = getCardStats(oVideo);
 
-            // Render battle cards
             const pCardEl = document.getElementById("player-battle-card");
             const oCardEl = document.getElementById("opponent-battle-card");
             pCardEl.innerHTML = "";
@@ -766,7 +769,6 @@
             pCardEl.appendChild(createBattleCardElement(pVideo));
             oCardEl.appendChild(createBattleCardElement(oVideo));
 
-            // Show stats
             document.getElementById("player-battle-stats").innerHTML = `
                 <span class="stat-atk">ATK ${pStats.atk}</span>
                 <span class="stat-def">DEF ${pStats.def}</span>
@@ -776,13 +778,11 @@
                 <span class="stat-def">DEF ${oStats.def}</span>
             `;
 
-            // Reset HP bars
             let pHp = pStats.hp;
             let oHp = oStats.hp;
             updateHpBar("player", pHp, pStats.hp);
             updateHpBar("opponent", oHp, oStats.hp);
 
-            // Type indicators
             const pMult = getTypeMultiplier(pVideo.category, oVideo.category);
             const oMult = getTypeMultiplier(oVideo.category, pVideo.category);
             const typeInd = document.getElementById("battle-type-indicator");
@@ -796,24 +796,20 @@
 
             addBattleLog(`--- Round ${round + 1} ---`);
             addBattleLog(`${truncate(pVideo.title, 25)} vs ${truncate(oVideo.title, 25)}`);
-
             if (pMult > 1) addBattleLog(`${pStats.element} is SUPER EFFECTIVE vs ${oStats.element}! (1.75x)`, "advantage");
             if (oMult > 1) addBattleLog(`${oStats.element} is SUPER EFFECTIVE vs ${pStats.element}! (1.75x)`, "disadvantage");
 
             await sleep(800);
 
-            // Combat loop
             let turn = 0;
             while (pHp > 0 && oHp > 0 && turn < 20) {
                 turn++;
 
-                // Player attacks
                 const pDmg = calcDamage(pStats.atk, oStats.def, pMult);
                 oHp = Math.max(0, oHp - pDmg);
 
                 const actionText = document.getElementById("battle-action-text");
 
-                // Player attack animation
                 document.getElementById("battle-player-side").classList.add("attacking");
                 actionText.textContent = `-${pDmg}`;
                 actionText.className = "battle-action-text damage-flash opponent-hit";
@@ -831,7 +827,6 @@
 
                 await sleep(300);
 
-                // Opponent attacks
                 const oDmg = calcDamage(oStats.atk, pStats.def, oMult);
                 pHp = Math.max(0, pHp - oDmg);
 
@@ -853,7 +848,6 @@
                 await sleep(300);
             }
 
-            // Determine round winner
             const playerWon = pHp > oHp;
             if (playerWon) {
                 playerWins++;
@@ -874,7 +868,6 @@
                 opponentHpLeft: oHp,
             });
 
-            // Check for early victory (2-0)
             if (playerWins === 2 || oppWins === 2) {
                 if (round < BATTLE_ROUNDS - 1) {
                     addBattleLog(`Match decided early!`, playerWins === 2 ? "win" : "lose");
@@ -886,14 +879,13 @@
             await sleep(1200);
         }
 
-        // Show results
         await sleep(800);
-        showBattleResult(playerWins > oppWins, playerWins, oppWins, roundResults);
+        await showBattleResult(playerWins > oppWins, playerWins, oppWins, roundResults);
     }
 
     function calcDamage(atk, def, typeMultiplier) {
         const baseDmg = Math.max(50, atk - def * 0.35);
-        const variance = 0.85 + Math.random() * 0.3; // 85%-115%
+        const variance = 0.85 + Math.random() * 0.3;
         return Math.floor(baseDmg * typeMultiplier * variance);
     }
 
@@ -905,7 +897,6 @@
         fill.style.width = pct + "%";
         text.textContent = Math.max(0, Math.ceil(current));
 
-        // Color based on HP
         if (pct > 50) fill.style.background = "#4ec94e";
         else if (pct > 25) fill.style.background = "#ffb628";
         else fill.style.background = "#ff3e5f";
@@ -924,7 +915,7 @@
         return str.length > len ? str.slice(0, len) + "..." : str;
     }
 
-    function showBattleResult(playerWon, playerWins, oppWins, roundResults) {
+    async function showBattleResult(playerWon, playerWins, oppWins, roundResults) {
         showRaidPhase("result");
 
         const banner = document.getElementById("result-banner");
@@ -937,7 +928,6 @@
             title.textContent = "VICTORY!";
             subtitle.textContent = `You defeated ${raidState.opponent.name} ${playerWins}-${oppWins}!`;
 
-            // Steal a random card from opponent's deck
             const stolenVideo = raidState.opponentCards[Math.floor(Math.random() * raidState.opponentCards.length)];
             const existing = getCollectionEntry(stolenVideo.id);
             if (existing) {
@@ -945,12 +935,17 @@
             } else {
                 state.collection.push({
                     videoId: stolenVideo.id,
+                    title: stolenVideo.title,
+                    channel: stolenVideo.channel,
+                    views: stolenVideo.views,
+                    category: stolenVideo.category,
+                    description: stolenVideo.description || "",
                     obtainedAt: new Date().toISOString(),
                     count: 1,
                 });
             }
+            await addToServerCollection(stolenVideo);
 
-            // Show reward
             rewardSection.classList.remove("hidden");
             const rewardContainer = document.getElementById("reward-card-container");
             rewardContainer.innerHTML = "";
@@ -969,7 +964,6 @@
             state.raidsLost++;
         }
 
-        // Battle history
         state.battleHistory.unshift({
             opponent: raidState.opponent.name,
             won: playerWon,
@@ -979,7 +973,12 @@
         if (state.battleHistory.length > 20) state.battleHistory.pop();
 
         state.raidsLeft--;
-        saveState();
+
+        await Promise.all([
+            saveRaidsLeft(),
+            saveStatsToServer(),
+            addBattleToServer(raidState.opponent.name, playerWon, `${playerWins}-${oppWins}`, "raid"),
+        ]);
 
         // Round summary
         const roundsDiv = document.getElementById("result-rounds");
@@ -1003,9 +1002,9 @@
 
     let arenaState = {
         difficulty: 2,
-        enemyCards: [null, null, null],    // video objects per lane
-        playerCards: [null, null, null],    // video objects per lane
-        selectedHandCard: null,            // videoId currently selected from hand
+        enemyCards: [null, null, null],
+        playerCards: [null, null, null],
+        selectedHandCard: null,
     };
 
     function showArenaPhase(phase) {
@@ -1023,7 +1022,7 @@
         document.getElementById("arena-need-cards").classList.add("hidden");
 
         arenaState.difficulty = difficulty;
-        arenaState.enemyCards = generateOpponentDeck(difficulty);
+        arenaState.enemyCards = generateOpponentDeck();
         arenaState.playerCards = [null, null, null];
         arenaState.selectedHandCard = null;
 
@@ -1032,7 +1031,6 @@
     }
 
     function renderArenaPlacement() {
-        // Render enemy cards in slots
         for (let i = 0; i < 3; i++) {
             const slot = document.getElementById(`arena-enemy-${i}`);
             slot.innerHTML = "";
@@ -1041,13 +1039,11 @@
             }
         }
 
-        // Render player slots
         for (let i = 0; i < 3; i++) {
             const slot = document.getElementById(`arena-player-${i}`);
             slot.innerHTML = "";
             if (arenaState.playerCards[i]) {
                 slot.appendChild(createBattleCardElement(arenaState.playerCards[i]));
-                // Show type matchup indicator
                 const pCat = arenaState.playerCards[i].category;
                 const eCat = arenaState.enemyCards[i].category;
                 const mult = getTypeMultiplier(pCat, eCat);
@@ -1067,7 +1063,6 @@
             }
         }
 
-        // Render hand (collection minus placed cards)
         const hand = document.getElementById("arena-hand");
         hand.innerHTML = "";
         const placedIds = arenaState.playerCards.filter(Boolean).map(v => v.id);
@@ -1083,7 +1078,7 @@
             const video = getVideoById(entry.videoId);
             if (!video) return;
             const isPlaced = placedIds.includes(video.id);
-            if (isPlaced) return; // Hide placed cards from hand
+            if (isPlaced) return;
 
             const isSelected = arenaState.selectedHandCard === video.id;
             const card = createCardElement(video, {
@@ -1097,15 +1092,12 @@
             hand.appendChild(card);
         });
 
-        // Update fight button
         const allPlaced = arenaState.playerCards.every(c => c !== null);
         document.getElementById("arena-fight-btn").disabled = !allPlaced;
     }
 
     function placeCardInLane(lane) {
         if (!arenaState.selectedHandCard) return;
-
-        // If lane already has a card, put it back in hand
         arenaState.playerCards[lane] = getVideoById(arenaState.selectedHandCard);
         arenaState.selectedHandCard = null;
         renderArenaPlacement();
@@ -1123,7 +1115,6 @@
         const log = document.getElementById("arena-battle-log");
         log.innerHTML = "";
 
-        // Set up battle cards and HP
         const lanes = [];
         for (let i = 0; i < 3; i++) {
             const pVideo = arenaState.playerCards[i];
@@ -1131,7 +1122,6 @@
             const pStats = getCardStats(pVideo);
             const eStats = getCardStats(eVideo);
 
-            // Render cards
             const pSlot = document.getElementById(`arena-b-player-${i}`);
             const eSlot = document.getElementById(`arena-b-enemy-${i}`);
             pSlot.innerHTML = "";
@@ -1139,11 +1129,9 @@
             pSlot.appendChild(createBattleCardElement(pVideo));
             eSlot.appendChild(createBattleCardElement(eVideo));
 
-            // Init HP
             updateArenaHp("p", i, pStats.hp, pStats.hp);
             updateArenaHp("e", i, eStats.hp, eStats.hp);
 
-            // Lane status
             document.getElementById(`arena-lane-status-${i}`).textContent = "VS";
             document.getElementById(`arena-lane-status-${i}`).className = "";
 
@@ -1156,7 +1144,6 @@
             });
         }
 
-        // Log type matchups
         const laneNames = ["LEFT", "CENTER", "RIGHT"];
         for (let i = 0; i < 3; i++) {
             const l = lanes[i];
@@ -1166,7 +1153,6 @@
 
         await sleep(800);
 
-        // Simultaneous combat — all lanes resolve together, turn by turn
         let turn = 0;
         while (lanes.some(l => !l.done) && turn < 25) {
             turn++;
@@ -1176,25 +1162,21 @@
                 const l = lanes[i];
                 if (l.done) continue;
 
-                // Player attacks
                 const pDmg = calcDamage(l.pStats.atk, l.eStats.def, l.pMult);
                 l.eHp = Math.max(0, l.eHp - pDmg);
 
-                // Enemy attacks
                 const eDmg = calcDamage(l.eStats.atk, l.pStats.def, l.eMult);
                 l.pHp = Math.max(0, l.pHp - eDmg);
 
                 addArenaLog(`${laneNames[i]}: -${pDmg} to enemy, -${eDmg} to you`);
             }
 
-            // Animate HP updates
             for (let i = 0; i < 3; i++) {
                 const l = lanes[i];
                 if (l.done) continue;
                 updateArenaHp("p", i, l.pHp, l.pStats.hp);
                 updateArenaHp("e", i, l.eHp, l.eStats.hp);
 
-                // Check if lane resolved
                 if (l.pHp <= 0 || l.eHp <= 0) {
                     l.done = true;
                     if (l.pHp > l.eHp) {
@@ -1222,7 +1204,6 @@
             await sleep(500);
         }
 
-        // Calculate breakthrough damage from survivors
         let playerBreakthrough = 0;
         let enemyBreakthrough = 0;
         for (const l of lanes) {
@@ -1242,7 +1223,6 @@
 
         await sleep(1000);
 
-        // Determine winner: lanes won first, then breakthrough as tiebreaker
         let playerWon;
         if (playerLanesWon !== enemyLanesWon) {
             playerWon = playerLanesWon > enemyLanesWon;
@@ -1250,7 +1230,7 @@
             playerWon = playerBreakthrough >= enemyBreakthrough;
         }
 
-        showArenaResult(playerWon, playerLanesWon, enemyLanesWon, playerBreakthrough, enemyBreakthrough, lanes);
+        await showArenaResult(playerWon, playerLanesWon, enemyLanesWon, playerBreakthrough, enemyBreakthrough, lanes);
     }
 
     function updateArenaHp(side, lane, current, max) {
@@ -1276,7 +1256,7 @@
         log.scrollTop = log.scrollHeight;
     }
 
-    function showArenaResult(playerWon, pLanes, eLanes, pBreak, eBreak, lanes) {
+    async function showArenaResult(playerWon, pLanes, eLanes, pBreak, eBreak, lanes) {
         showArenaPhase("result");
 
         const banner = document.getElementById("arena-result-banner");
@@ -1293,7 +1273,6 @@
             subtitle.textContent = `Lanes won: ${pLanes}-${eLanes} | Breakthrough: ${pBreak} vs ${eBreak}`;
         }
 
-        // Lane-by-lane summary
         const lanesDiv = document.getElementById("arena-result-lanes");
         lanesDiv.innerHTML = "";
         const laneNames = ["LEFT", "CENTER", "RIGHT"];
@@ -1314,7 +1293,6 @@
             lanesDiv.appendChild(div);
         });
 
-        // Track in battle history
         state.battleHistory.unshift({
             opponent: `Arena (${arenaState.difficulty === 1 ? "Easy" : arenaState.difficulty === 2 ? "Medium" : "Hard"})`,
             won: playerWon,
@@ -1324,7 +1302,16 @@
         if (state.battleHistory.length > 20) state.battleHistory.pop();
         if (playerWon) state.raidsWon++;
         else state.raidsLost++;
-        saveState();
+
+        await Promise.all([
+            saveStatsToServer(),
+            addBattleToServer(
+                `Arena (${arenaState.difficulty === 1 ? "Easy" : arenaState.difficulty === 2 ? "Medium" : "Hard"})`,
+                playerWon,
+                `${pLanes}-${eLanes}`,
+                "arena"
+            ),
+        ]);
     }
 
     // --- Stats View ---
@@ -1355,7 +1342,6 @@
         document.getElementById("stat-epic").textContent = rarityCounts["epic"] || 0;
         document.getElementById("stat-rare").textContent = rarityCounts["rare"];
 
-        // Rarity bars
         const barsContainer = document.getElementById("rarity-bars");
         barsContainer.innerHTML = "";
         const maxCount = Math.max(1, ...Object.values(rarityCounts));
@@ -1376,7 +1362,6 @@
             barsContainer.appendChild(row);
         });
 
-        // Battle history
         const historyList = document.getElementById("battle-history-list");
         historyList.innerHTML = "";
         if (state.battleHistory.length === 0) {
@@ -1394,6 +1379,33 @@
                 historyList.appendChild(div);
             });
         }
+    }
+
+    // --- Settings View ---
+    async function initSettings() {
+        const apiKeyInput = document.getElementById("api-key-input");
+        const saveBtn = document.getElementById("save-api-key");
+        const statusEl = document.getElementById("api-key-status");
+
+        // Load existing API key
+        const existingKey = await loadSetting("youtube_api_key");
+        if (existingKey) {
+            apiKeyInput.value = existingKey;
+            statusEl.textContent = "API key saved.";
+            statusEl.style.color = "#4ec94e";
+        }
+
+        saveBtn.addEventListener("click", async () => {
+            const key = apiKeyInput.value.trim();
+            if (!key) {
+                statusEl.textContent = "Please enter an API key.";
+                statusEl.style.color = "#ff3e5f";
+                return;
+            }
+            await saveSetting("youtube_api_key", key);
+            statusEl.textContent = "API key saved!";
+            statusEl.style.color = "#4ec94e";
+        });
     }
 
     // --- Navigation ---
@@ -1414,10 +1426,19 @@
         if (viewName === "arena") {
             showArenaPhase("lobby");
         }
+        if (viewName === "settings") initSettings();
     }
 
-    // --- Event Listeners ---
-    function init() {
+    // --- Event Listeners & Init ---
+    async function init() {
+        // Load data from server
+        try {
+            AI_OPPONENTS = await loadOpponents(12);
+            await loadStateFromServer();
+        } catch (err) {
+            console.error("Failed to load from server:", err);
+        }
+
         // Navigation
         document.querySelectorAll(".nav-btn").forEach(btn => {
             btn.addEventListener("click", () => switchView(btn.dataset.view));
@@ -1469,7 +1490,7 @@
         document.getElementById("arena-reset-btn").addEventListener("click", resetArenaPlacement);
         document.getElementById("arena-again-btn").addEventListener("click", () => showArenaPhase("lobby"));
 
-        // Initialize
+        // Initialize UI
         resetPackUI();
     }
 

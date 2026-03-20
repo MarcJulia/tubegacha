@@ -1,0 +1,5 @@
+node_modules/
+tubegacha.db
+tubegacha.db-shm
+tubegacha.db-wal
+.env

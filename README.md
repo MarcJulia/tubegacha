@@ -2,22 +2,27 @@
 
 A browser-based collectible card game where YouTube videos become battle cards. Open daily packs, build your collection, and fight in strategic card battles.
 
-## Play
+## Setup
 
-Open `index.html` in any modern browser. No server or build step required.
+```bash
+npm install
+node server.js
+```
+
+Open http://localhost:3000, go to Settings, and enter a YouTube Data API v3 key. Cards are fetched live from YouTube each time you open a pack.
 
 ## Features
 
 ### Gacha Packs
 - 3 daily packs, 3 cards per pack
-- 5 rarity tiers based on view count: Common, Uncommon, Rare, Super Rare, Legendary
-- Weighted pull rates — legendaries are rare (~3%)
+- Each pack pulls fresh videos from the YouTube API
+- 7 rarity tiers based on view count: Common, Uncommon, Rare, Super Rare, Epic, Legendary, Mythic
 - Duplicate tracking and NEW badges
 
 ### Trading Card Design
 - Full card frames with art window, name plate, flavor text, and stat bar
-- Holographic shimmer effect on Super Rare and Legendary cards
-- Rarity stars (1-5) and color-coded borders
+- Holographic shimmer effect on Super Rare, Epic, Legendary, and Mythic cards
+- Rarity stars (1-7) and color-coded borders
 - Elemental type emblem on each card
 
 ### 10 Elemental Types
@@ -40,7 +45,6 @@ Each element is strong against 2 others (1.75x damage) and weak to 2 others (0.5
 
 ### Raid Battle
 - 2 daily raids against AI opponents
-- 12 opponents across Easy, Medium, and Hard difficulty
 - Sequential best-of-3 card combat with animated HP bars and attack effects
 - Win to steal a card from the opponent's deck
 
@@ -53,7 +57,6 @@ Each element is strong against 2 others (1.75x damage) and weak to 2 others (0.5
 ### Top 10 Leaderboard
 - Fetches the real top 10 most-viewed YouTube videos live from Wikipedia
 - Shows ownership status for each card
-- Falls back to cached data if offline
 
 ### Stats & History
 - Total cards, unique cards, rarity distribution
@@ -62,19 +65,21 @@ Each element is strong against 2 others (1.75x damage) and weak to 2 others (0.5
 
 ## Tech
 
-- Vanilla HTML, CSS, JavaScript — no dependencies
-- All state persisted in `localStorage`
-- YouTube thumbnails loaded via `img.youtube.com`
+- Express + better-sqlite3 backend
+- Vanilla HTML, CSS, JavaScript frontend
+- YouTube Data API v3 for live video pulls
+- SQLite stores only collected cards and game state (no pre-built video pool)
 - Wikipedia REST API for live Top 10 data
 
 ## Files
 
 | File | Description |
 |---|---|
-| `index.html` | Main page with all views |
+| `server.js` | Express server, SQLite schema, YouTube API fetching, opponent generation |
+| `index.html` | Single-page app with tab navigation |
 | `style.css` | Dark theme, card design, battle animations |
 | `app.js` | Game engine: gacha, battles, arena, state management |
-| `videos.js` | Video database, type chart, AI opponents |
+| `videos.js` | API helpers, type chart, Wikipedia Top 10 scraper |
 
 ## License
 
