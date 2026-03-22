@@ -9,58 +9,9 @@ const db = new Database(path.join(__dirname, "tubegacha.db"));
 
 db.pragma("journal_mode = WAL");
 
-// --- Schema ---
-db.exec(`
-    CREATE TABLE IF NOT EXISTS collection (
-        video_id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        channel TEXT NOT NULL,
-        views INTEGER NOT NULL,
-        category TEXT NOT NULL,
-        description TEXT,
-        count INTEGER DEFAULT 1,
-        obtained_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS game_state (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS battle_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        opponent TEXT NOT NULL,
-        won INTEGER NOT NULL,
-        score TEXT NOT NULL,
-        mode TEXT DEFAULT 'raid',
-        date TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    );
-`);
-
-// --- Prepared statements ---
-const stmts = {
-    getCollection: db.prepare("SELECT * FROM collection ORDER BY obtained_at DESC"),
-    getCollectionEntry: db.prepare("SELECT * FROM collection WHERE video_id = ?"),
-    addToCollection: db.prepare(`
-        INSERT INTO collection (video_id, title, channel, views, category, description, count)
-        VALUES (@video_id, @title, @channel, @views, @category, @description, 1)
-        ON CONFLICT(video_id) DO UPDATE SET count = count + 1
-    `),
-
-    getState: db.prepare("SELECT value FROM game_state WHERE key = ?"),
-    setState: db.prepare("INSERT OR REPLACE INTO game_state (key, value) VALUES (?, ?)"),
-
-    addBattle: db.prepare("INSERT INTO battle_history (opponent, won, score, mode) VALUES (?, ?, ?, ?)"),
-    getBattles: db.prepare("SELECT * FROM battle_history ORDER BY date DESC LIMIT 20"),
-
-    getSetting: db.prepare("SELECT value FROM settings WHERE key = ?"),
-    setSetting: db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"),
-};
+// --- Schema (only players table for arena ratings) ---
+// Collection, game state, battle history, and settings are all stored
+// client-side in localStorage for per-player persistence.
 
 // --- YouTube API ---
 const YT_CATEGORIES = {
@@ -201,7 +152,7 @@ app.use(express.static(__dirname));
 // Pull cards — fetches from YouTube on demand
 app.post("/api/pull", async (req, res) => {
     const count = parseInt(req.body.count) || 3;
-    const apiKey = process.env.YOUTUBE_API_KEY || stmts.getSetting.get("youtube_api_key")?.value;
+    const apiKey = process.env.YOUTUBE_API_KEY || req.body.apiKey;
 
     if (!apiKey) {
         return res.status(400).json({ error: "No YouTube API key configured. Set YOUTUBE_API_KEY in .env or add one in Settings." });
@@ -221,71 +172,268 @@ app.post("/api/pull", async (req, res) => {
     res.json(cards);
 });
 
-// Collection
-app.get("/api/collection", (req, res) => {
-    res.json(stmts.getCollection.all());
-});
-
-app.post("/api/collection/add", (req, res) => {
-    const { video_id, title, channel, views, category, description } = req.body;
-    if (!video_id) return res.status(400).json({ error: "video_id required" });
-    stmts.addToCollection.run({
-        video_id,
-        title: title || "",
-        channel: channel || "",
-        views: views || 0,
-        category: category || "Entertainment",
-        description: description || "",
-    });
-    res.json({ ok: true });
-});
-
-// Game state
-app.get("/api/state/:key", (req, res) => {
-    const row = stmts.getState.get(req.params.key);
-    res.json({ value: row ? JSON.parse(row.value) : null });
-});
-
-app.post("/api/state/:key", (req, res) => {
-    stmts.setState.run(req.params.key, JSON.stringify(req.body.value));
-    res.json({ ok: true });
-});
-
-// Battle history
-app.get("/api/battles", (req, res) => {
-    res.json(stmts.getBattles.all());
-});
-
-app.post("/api/battles", (req, res) => {
-    const { opponent, won, score, mode } = req.body;
-    stmts.addBattle.run(opponent, won ? 1 : 0, score, mode || "raid");
-    res.json({ ok: true });
-});
-
 // Opponents (procedurally generated)
 app.get("/api/opponents", (req, res) => {
     const count = parseInt(req.query.count) || 4;
     res.json(generateOpponents(count));
 });
 
-// Settings
-app.get("/api/settings/:key", (req, res) => {
-    const row = stmts.getSetting.get(req.params.key);
-    res.json({ value: row ? row.value : null });
+// --- Arena Matchmaking ---
+
+// --- Async PvP Arena ---
+db.exec(`
+    CREATE TABLE IF NOT EXISTS players (
+        player_id TEXT PRIMARY KEY,
+        name TEXT DEFAULT '',
+        avatar TEXT DEFAULT '',
+        rating INTEGER DEFAULT 1000,
+        arena_wins INTEGER DEFAULT 0,
+        arena_losses INTEGER DEFAULT 0,
+        defense_cards TEXT DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS attack_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attacker_id TEXT NOT NULL,
+        attacker_name TEXT NOT NULL,
+        attacker_avatar TEXT DEFAULT '',
+        defender_id TEXT NOT NULL,
+        defender_name TEXT NOT NULL,
+        attacker_won INTEGER NOT NULL,
+        score TEXT NOT NULL,
+        attacker_rating_change INTEGER DEFAULT 0,
+        defender_rating_change INTEGER DEFAULT 0,
+        date TEXT DEFAULT (datetime('now'))
+    );
+`);
+
+// Add columns if upgrading from old schema
+try { db.exec("ALTER TABLE players ADD COLUMN name TEXT DEFAULT ''"); } catch (e) {}
+try { db.exec("ALTER TABLE players ADD COLUMN avatar TEXT DEFAULT ''"); } catch (e) {}
+try { db.exec("ALTER TABLE players ADD COLUMN defense_cards TEXT DEFAULT '[]'"); } catch (e) {}
+
+const arenaStmts = {
+    getPlayer: db.prepare("SELECT * FROM players WHERE player_id = ?"),
+    upsertPlayer: db.prepare(`
+        INSERT INTO players (player_id, name, avatar, rating, arena_wins, arena_losses, defense_cards)
+        VALUES (@player_id, @name, @avatar, 1000, 0, 0, '[]')
+        ON CONFLICT(player_id) DO UPDATE SET name=@name, avatar=@avatar
+    `),
+    setDefense: db.prepare("UPDATE players SET defense_cards = ? WHERE player_id = ?"),
+    findOpponents: db.prepare(`
+        SELECT player_id, name, avatar, rating, arena_wins, arena_losses, defense_cards
+        FROM players
+        WHERE player_id != ? AND defense_cards != '[]'
+        ORDER BY ABS(rating - ?) ASC
+        LIMIT ?
+    `),
+    updateWin: db.prepare("UPDATE players SET rating = rating + ?, arena_wins = arena_wins + 1 WHERE player_id = ?"),
+    updateLoss: db.prepare("UPDATE players SET rating = MAX(0, rating + ?), arena_losses = arena_losses + 1 WHERE player_id = ?"),
+    addAttackLog: db.prepare(`
+        INSERT INTO attack_log (attacker_id, attacker_name, attacker_avatar, defender_id, defender_name, attacker_won, score, attacker_rating_change, defender_rating_change)
+        VALUES (@attacker_id, @attacker_name, @attacker_avatar, @defender_id, @defender_name, @attacker_won, @score, @attacker_rating_change, @defender_rating_change)
+    `),
+    getDefenseLog: db.prepare(`
+        SELECT * FROM attack_log WHERE defender_id = ? ORDER BY date DESC LIMIT 20
+    `),
+    getAttackLog: db.prepare(`
+        SELECT * FROM attack_log WHERE attacker_id = ? ORDER BY date DESC LIMIT 20
+    `),
+};
+
+function calcElo(winnerRating, loserRating) {
+    const K = 32;
+    const expected = 1 / (1 + Math.pow(10, (loserRating - winnerRating) / 400));
+    return Math.round(K * (1 - expected));
+}
+
+// Register / update player profile
+app.post("/api/arena/register", (req, res) => {
+    const { playerId, name, avatar } = req.body;
+    if (!playerId) return res.status(400).json({ error: "playerId required" });
+    arenaStmts.upsertPlayer.run({ player_id: playerId, name: name || "", avatar: avatar || "" });
+    const player = arenaStmts.getPlayer.get(playerId);
+    res.json(player);
 });
 
-app.post("/api/settings/:key", (req, res) => {
-    stmts.setSetting.run(req.params.key, req.body.value);
+// Get player info
+app.get("/api/arena/player/:id", (req, res) => {
+    const player = arenaStmts.getPlayer.get(req.params.id);
+    if (!player) return res.json({ player_id: req.params.id, name: "", avatar: "", rating: 1000, arena_wins: 0, arena_losses: 0, defense_cards: "[]" });
+    res.json(player);
+});
+
+// Set defense formation
+app.post("/api/arena/defense", (req, res) => {
+    const { playerId, cards } = req.body;
+    if (!playerId || !cards || cards.length !== 3) {
+        return res.status(400).json({ error: "Need playerId and 3 cards" });
+    }
+    arenaStmts.setDefense.run(JSON.stringify(cards), playerId);
     res.json({ ok: true });
+});
+
+// Battle — find random opponent near your rating and fight
+app.post("/api/arena/battle", (req, res) => {
+    const { attackerId, attackCards } = req.body;
+    if (!attackerId || !attackCards || attackCards.length !== 3) {
+        return res.status(400).json({ error: "Need attackerId and 3 attack cards" });
+    }
+
+    const attacker = arenaStmts.getPlayer.get(attackerId);
+    const attackerRating = attacker ? attacker.rating : 1000;
+
+    // Find random opponent near rating with a defense set
+    const opponents = arenaStmts.findOpponents.all(attackerId, attackerRating, 20);
+    if (opponents.length === 0) {
+        return res.status(404).json({ error: "No opponents found. Wait for others to set their defense!" });
+    }
+
+    // Pick a random one from the pool
+    const defender = opponents[Math.floor(Math.random() * opponents.length)];
+    const defenseCards = JSON.parse(defender.defense_cards);
+    const defenderRating = defender.rating;
+
+    const result = computeBattle(attackCards, defenseCards);
+
+    const eloGain = calcElo(
+        result.attackerWon ? attackerRating : defenderRating,
+        result.attackerWon ? defenderRating : attackerRating
+    );
+
+    const atkChange = result.attackerWon ? eloGain : -eloGain;
+    const defChange = result.attackerWon ? -eloGain : eloGain;
+
+    if (result.attackerWon) {
+        arenaStmts.updateWin.run(eloGain, attackerId);
+        arenaStmts.updateLoss.run(-eloGain, defender.player_id);
+    } else {
+        arenaStmts.updateLoss.run(-eloGain, attackerId);
+        arenaStmts.updateWin.run(eloGain, defender.player_id);
+    }
+
+    arenaStmts.addAttackLog.run({
+        attacker_id: attackerId,
+        attacker_name: attacker ? attacker.name : "",
+        attacker_avatar: attacker ? attacker.avatar : "",
+        defender_id: defender.player_id,
+        defender_name: defender.name,
+        attacker_won: result.attackerWon ? 1 : 0,
+        score: result.score,
+        attacker_rating_change: atkChange,
+        defender_rating_change: defChange,
+    });
+
+    res.json({
+        opponent: { name: defender.name, avatar: defender.avatar, rating: defenderRating },
+        defenseCards,
+        attackerWon: result.attackerWon,
+        score: result.score,
+        lanes: result.lanes,
+        eloChange: atkChange,
+        newRating: attackerRating + atkChange,
+    });
+});
+
+// Get defense log (attacks against you)
+app.get("/api/arena/defense-log/:playerId", (req, res) => {
+    const logs = arenaStmts.getDefenseLog.all(req.params.playerId);
+    res.json(logs);
+});
+
+// Server-side battle computation (deterministic, matches client logic)
+function computeBattle(atkCards, defCards) {
+    const ELEMENT_PROFILES = {
+        "Music": { atkMul: 1.25, defMul: 0.90, hpMul: 0.95 },
+        "Comedy": { atkMul: 1.10, defMul: 0.85, hpMul: 1.15 },
+        "Education": { atkMul: 0.90, defMul: 1.25, hpMul: 1.00 },
+        "Tech": { atkMul: 1.15, defMul: 1.10, hpMul: 0.85 },
+        "Entertainment": { atkMul: 1.05, defMul: 0.95, hpMul: 1.10 },
+        "Food": { atkMul: 0.85, defMul: 1.05, hpMul: 1.25 },
+        "Travel": { atkMul: 0.95, defMul: 1.15, hpMul: 1.05 },
+        "Gaming": { atkMul: 1.20, defMul: 1.00, hpMul: 0.90 },
+        "Fitness": { atkMul: 1.10, defMul: 1.05, hpMul: 1.00 },
+        "Art": { atkMul: 1.00, defMul: 1.00, hpMul: 1.15 },
+    };
+    const TYPE_ADV = {
+        "Music": ["Comedy", "Art"], "Comedy": ["Education", "Fitness"],
+        "Education": ["Tech", "Gaming"], "Tech": ["Entertainment", "Travel"],
+        "Entertainment": ["Music", "Food"], "Food": ["Fitness", "Travel"],
+        "Travel": ["Art", "Comedy"], "Gaming": ["Entertainment", "Music"],
+        "Fitness": ["Tech", "Gaming"], "Art": ["Education", "Food"],
+    };
+    const RARITY_TIERS = [
+        { min: 5e9, atk: 1200, def: 1000, hp: 7000 },
+        { min: 1e9, atk: 950, def: 800, hp: 5500 },
+        { min: 5e8, atk: 820, def: 700, hp: 4800 },
+        { min: 1e8, atk: 720, def: 600, hp: 4200 },
+        { min: 1e7, atk: 520, def: 440, hp: 3000 },
+        { min: 1e6, atk: 350, def: 300, hp: 2100 },
+        { min: 0,   atk: 200, def: 170, hp: 1400 },
+    ];
+
+    function getStats(card) {
+        let tier = RARITY_TIERS[RARITY_TIERS.length - 1];
+        for (const t of RARITY_TIERS) { if (card.views >= t.min) { tier = t; break; } }
+        const el = ELEMENT_PROFILES[card.category] || ELEMENT_PROFILES["Entertainment"];
+        const variance = 1 + (card.views % 1000) / 5000;
+        return {
+            atk: Math.round(tier.atk * el.atkMul * variance),
+            def: Math.round(tier.def * el.defMul * variance),
+            hp: Math.round(tier.hp * el.hpMul * variance),
+        };
+    }
+
+    function getTypeMul(atkCat, defCat) {
+        if ((TYPE_ADV[atkCat] || []).includes(defCat)) return 1.75;
+        if ((TYPE_ADV[defCat] || []).includes(atkCat)) return 0.55;
+        return 1;
+    }
+
+    let atkLanes = 0, defLanes = 0;
+    const lanes = [];
+    for (let i = 0; i < 3; i++) {
+        const aS = getStats(atkCards[i]), dS = getStats(defCards[i]);
+        const aMul = getTypeMul(atkCards[i].category, defCards[i].category);
+        const dMul = getTypeMul(defCards[i].category, atkCards[i].category);
+        let aHp = aS.hp, dHp = dS.hp;
+
+        for (let t = 0; t < 25 && aHp > 0 && dHp > 0; t++) {
+            dHp -= Math.max(1, Math.round((aS.atk * aMul) - dS.def * 0.3));
+            aHp -= Math.max(1, Math.round((dS.atk * dMul) - aS.def * 0.3));
+        }
+
+        let winner = "draw";
+        if (aHp > dHp) { winner = "attacker"; atkLanes++; }
+        else if (dHp > aHp) { winner = "defender"; defLanes++; }
+        lanes.push({ winner, aHpLeft: Math.max(0, aHp), dHpLeft: Math.max(0, dHp) });
+    }
+
+    return {
+        attackerWon: atkLanes >= defLanes,
+        score: `${atkLanes}-${defLanes}`,
+        lanes,
+    };
+}
+
+// Top 10 — proxy Wikipedia fetch to avoid CORS issues
+app.get("/api/top10", async (req, res) => {
+    const WIKI_API = "https://en.wikipedia.org/api/rest_v1/page/html/List_of_most-viewed_YouTube_videos";
+    try {
+        const resp = await fetch(WIKI_API);
+        if (!resp.ok) throw new Error("Wiki fetch failed");
+        const html = await resp.text();
+        res.set("Content-Type", "text/html");
+        res.send(html);
+    } catch (err) {
+        res.status(502).json({ error: err.message });
+    }
 });
 
 // Status
 app.get("/api/status", (req, res) => {
-    const hasApiKey = !!(process.env.YOUTUBE_API_KEY || stmts.getSetting.get("youtube_api_key")?.value);
-    const collectionCount = stmts.getCollection.all().length;
     res.json({
-        hasApiKey,
-        collectionCount,
+        hasApiKey: !!process.env.YOUTUBE_API_KEY,
         bufferSize: videoBuffer.length,
     });
 });

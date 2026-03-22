@@ -12,6 +12,10 @@
     <div id="app">
         <header>
             <h1 class="logo">Tube<span>Gacha</span></h1>
+            <div class="header-profile" id="header-profile">
+                <span class="header-avatar" id="header-avatar"></span>
+                <span class="header-username" id="header-username"></span>
+            </div>
             <nav>
                 <button class="nav-btn active" data-view="pack">Pack</button>
                 <button class="nav-btn" data-view="collection">Collection</button>
@@ -189,100 +193,97 @@
 
             <!-- Arena View -->
             <section id="view-arena" class="view">
-                <!-- Phase: lobby -->
+                <!-- Lobby: overview with tabs -->
                 <div id="arena-lobby">
                     <div class="raid-header">
                         <h2>Grid Arena</h2>
-                        <span class="arena-badge">Unlimited</span>
+                        <span class="arena-badge">Async PvP</span>
                     </div>
-                    <p class="raid-desc">A 3-lane battlefield. See your opponent's formation, then place your cards to counter. Each lane fights independently — survivors deal breakthrough damage!</p>
-                    <h3 class="raid-subtitle">Choose Difficulty</h3>
-                    <div class="arena-diff-btns">
-                        <button class="arena-diff-btn" data-diff="1">Easy</button>
-                        <button class="arena-diff-btn" data-diff="2">Medium</button>
-                        <button class="arena-diff-btn" data-diff="3">Hard</button>
+                    <div class="arena-rating-display">
+                        <span class="arena-rating-label">Rating:</span>
+                        <span class="arena-rating-value" id="arena-my-rating">1000</span>
+                        <span class="arena-record" id="arena-my-record">0W / 0L</span>
                     </div>
-                    <p id="arena-need-cards" class="empty-msg hidden">You need at least 3 cards to enter the arena.</p>
+                    <div class="arena-tabs">
+                        <button class="arena-tab active" data-arena-tab="attack">Battle</button>
+                        <button class="arena-tab" data-arena-tab="defense">Set Defense</button>
+                        <button class="arena-tab" data-arena-tab="log">Defense Log</button>
+                    </div>
+
+                    <!-- Tab: Set attack formation & battle -->
+                    <div id="arena-tab-attack" class="arena-tab-content">
+                        <p class="raid-desc">Set your attack formation, then hit Battle to fight a random opponent near your rating!</p>
+                        <h3 class="raid-subtitle">Your Attack Formation</h3>
+                        <div class="arena-grid">
+                            <div class="arena-lane-labels"><span>LEFT</span><span>CENTER</span><span>RIGHT</span></div>
+                            <div class="arena-row player-row">
+                                <div class="arena-slot arena-atk-drop" id="arena-atk-0" data-lane="0"><span class="drop-hint">Tap card, then here</span></div>
+                                <div class="arena-slot arena-atk-drop" id="arena-atk-1" data-lane="1"><span class="drop-hint">Tap card, then here</span></div>
+                                <div class="arena-slot arena-atk-drop" id="arena-atk-2" data-lane="2"><span class="drop-hint">Tap card, then here</span></div>
+                            </div>
+                        </div>
+                        <div id="arena-atk-hand" class="card-grid selectable-grid"></div>
+                        <div class="arena-action-bar">
+                            <button id="arena-battle-btn" class="btn-primary" disabled>Battle!</button>
+                            <button id="arena-atk-reset-btn" class="btn-secondary">Reset</button>
+                        </div>
+                        <p id="arena-need-cards" class="empty-msg hidden">You need at least 3 cards to enter the arena.</p>
+                        <p id="arena-battle-error" class="empty-msg hidden"></p>
+                    </div>
+
+                    <!-- Tab: Set your defense -->
+                    <div id="arena-tab-defense" class="arena-tab-content hidden">
+                        <p class="raid-desc">Set 3 cards as your defense. Other players will see this formation and try to beat it. You earn rating when attackers lose!</p>
+                        <div class="arena-defense-current">
+                            <h3 class="raid-subtitle">Current Defense</h3>
+                            <div id="arena-defense-display" class="arena-defense-slots"></div>
+                            <p id="arena-no-defense" class="empty-msg">No defense set yet. Place your cards below!</p>
+                        </div>
+                        <h3 class="raid-subtitle">Place New Defense</h3>
+                        <div class="arena-grid">
+                            <div class="arena-lane-labels"><span>LEFT</span><span>CENTER</span><span>RIGHT</span></div>
+                            <div class="arena-row player-row">
+                                <div class="arena-slot arena-drop" id="arena-def-0" data-lane="0"><span class="drop-hint">Tap card, then here</span></div>
+                                <div class="arena-slot arena-drop" id="arena-def-1" data-lane="1"><span class="drop-hint">Tap card, then here</span></div>
+                                <div class="arena-slot arena-drop" id="arena-def-2" data-lane="2"><span class="drop-hint">Tap card, then here</span></div>
+                            </div>
+                        </div>
+                        <div id="arena-def-hand" class="card-grid selectable-grid"></div>
+                        <div class="arena-action-bar">
+                            <button id="arena-save-defense-btn" class="btn-primary" disabled>Save Defense</button>
+                            <button id="arena-reset-defense-btn" class="btn-secondary">Reset</button>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Defense log -->
+                    <div id="arena-tab-log" class="arena-tab-content hidden">
+                        <p class="raid-desc">See who attacked your defense while you were away.</p>
+                        <div id="arena-defense-log"></div>
+                        <p id="arena-no-log" class="empty-msg hidden">No attacks on your defense yet.</p>
+                    </div>
                 </div>
 
-                <!-- Phase: placement -->
-                <div id="arena-placement" class="hidden">
-                    <h3 class="raid-subtitle">Enemy Formation — Place Your Cards to Counter!</h3>
-                    <div class="arena-grid">
-                        <div class="arena-lane-labels">
-                            <span>LEFT</span><span>CENTER</span><span>RIGHT</span>
-                        </div>
-                        <div class="arena-row enemy-row">
-                            <div class="arena-slot" id="arena-enemy-0"></div>
-                            <div class="arena-slot" id="arena-enemy-1"></div>
-                            <div class="arena-slot" id="arena-enemy-2"></div>
-                        </div>
-                        <div class="arena-vs-divider">
-                            <span>VS</span><span>VS</span><span>VS</span>
-                        </div>
-                        <div class="arena-row player-row">
-                            <div class="arena-slot arena-drop" id="arena-player-0" data-lane="0">
-                                <span class="drop-hint">Tap a card then tap here</span>
-                            </div>
-                            <div class="arena-slot arena-drop" id="arena-player-1" data-lane="1">
-                                <span class="drop-hint">Tap a card then tap here</span>
-                            </div>
-                            <div class="arena-slot arena-drop" id="arena-player-2" data-lane="2">
-                                <span class="drop-hint">Tap a card then tap here</span>
-                            </div>
-                        </div>
-                    </div>
-                    <h3 class="raid-subtitle">Your Cards</h3>
-                    <div id="arena-hand" class="card-grid selectable-grid"></div>
-                    <div class="arena-action-bar">
-                        <button id="arena-fight-btn" class="btn-primary" disabled>Fight!</button>
-                        <button id="arena-reset-btn" class="btn-secondary">Reset</button>
-                    </div>
-                </div>
-
-                <!-- Phase: battle -->
+                <!-- Battle animation -->
                 <div id="arena-battle" class="hidden">
                     <div class="arena-battle-grid">
-                        <div class="arena-lane-labels">
-                            <span>LEFT</span><span>CENTER</span><span>RIGHT</span>
-                        </div>
+                        <div class="arena-lane-labels"><span>LEFT</span><span>CENTER</span><span>RIGHT</span></div>
                         <div class="arena-row enemy-row">
                             <div class="arena-battle-slot" id="arena-b-enemy-0"></div>
                             <div class="arena-battle-slot" id="arena-b-enemy-1"></div>
                             <div class="arena-battle-slot" id="arena-b-enemy-2"></div>
                         </div>
                         <div class="arena-hp-row">
-                            <div class="arena-lane-hp">
-                                <div class="hp-track"><div class="hp-fill" id="arena-ehp-0"></div></div>
-                                <span class="hp-value" id="arena-ehp-text-0"></span>
-                            </div>
-                            <div class="arena-lane-hp">
-                                <div class="hp-track"><div class="hp-fill" id="arena-ehp-1"></div></div>
-                                <span class="hp-value" id="arena-ehp-text-1"></span>
-                            </div>
-                            <div class="arena-lane-hp">
-                                <div class="hp-track"><div class="hp-fill" id="arena-ehp-2"></div></div>
-                                <span class="hp-value" id="arena-ehp-text-2"></span>
-                            </div>
+                            <div class="arena-lane-hp"><div class="hp-track"><div class="hp-fill" id="arena-ehp-0"></div></div><span class="hp-value" id="arena-ehp-text-0"></span></div>
+                            <div class="arena-lane-hp"><div class="hp-track"><div class="hp-fill" id="arena-ehp-1"></div></div><span class="hp-value" id="arena-ehp-text-1"></span></div>
+                            <div class="arena-lane-hp"><div class="hp-track"><div class="hp-fill" id="arena-ehp-2"></div></div><span class="hp-value" id="arena-ehp-text-2"></span></div>
                         </div>
                         <div class="arena-vs-divider battle-vs">
-                            <span id="arena-lane-status-0">VS</span>
-                            <span id="arena-lane-status-1">VS</span>
-                            <span id="arena-lane-status-2">VS</span>
+                            <span id="arena-lane-status-0">VS</span><span id="arena-lane-status-1">VS</span><span id="arena-lane-status-2">VS</span>
                         </div>
                         <div class="arena-hp-row">
-                            <div class="arena-lane-hp">
-                                <div class="hp-track"><div class="hp-fill" id="arena-php-0"></div></div>
-                                <span class="hp-value" id="arena-php-text-0"></span>
-                            </div>
-                            <div class="arena-lane-hp">
-                                <div class="hp-track"><div class="hp-fill" id="arena-php-1"></div></div>
-                                <span class="hp-value" id="arena-php-text-1"></span>
-                            </div>
-                            <div class="arena-lane-hp">
-                                <div class="hp-track"><div class="hp-fill" id="arena-php-2"></div></div>
-                                <span class="hp-value" id="arena-php-text-2"></span>
-                            </div>
+                            <div class="arena-lane-hp"><div class="hp-track"><div class="hp-fill" id="arena-php-0"></div></div><span class="hp-value" id="arena-php-text-0"></span></div>
+                            <div class="arena-lane-hp"><div class="hp-track"><div class="hp-fill" id="arena-php-1"></div></div><span class="hp-value" id="arena-php-text-1"></span></div>
+                            <div class="arena-lane-hp"><div class="hp-track"><div class="hp-fill" id="arena-php-2"></div></div><span class="hp-value" id="arena-php-text-2"></span></div>
                         </div>
                         <div class="arena-row player-row">
                             <div class="arena-battle-slot" id="arena-b-player-0"></div>
@@ -293,7 +294,7 @@
                     <div id="arena-battle-log" class="battle-log"></div>
                 </div>
 
-                <!-- Phase: result -->
+                <!-- Result -->
                 <div id="arena-result" class="hidden">
                     <div id="arena-result-banner" class="result-banner">
                         <h2 id="arena-result-title"></h2>
@@ -303,7 +304,7 @@
                         <h3>Lane Results</h3>
                         <div id="arena-result-lanes"></div>
                     </div>
-                    <button id="arena-again-btn" class="btn-primary">Play Again</button>
+                    <button id="arena-again-btn" class="btn-primary">Back to Arena</button>
                 </div>
             </section>
 
@@ -382,6 +383,24 @@
             <!-- Settings View -->
             <section id="view-settings" class="view">
                 <h2>Settings</h2>
+                <div class="settings-section">
+                    <h3>Profile</h3>
+                    <div class="profile-edit">
+                        <div class="profile-avatar-picker">
+                            <div class="profile-current-avatar" id="profile-current-avatar"></div>
+                            <div class="profile-avatar-grid" id="profile-avatar-grid"></div>
+                        </div>
+                        <div class="profile-name-edit">
+                            <label>Username</label>
+                            <div class="settings-input-row">
+                                <input type="text" id="profile-name-input" class="settings-input" maxlength="20" placeholder="Enter username">
+                                <button id="profile-randomize-btn" class="btn-secondary" title="Random name">&#127922;</button>
+                                <button id="profile-save-btn" class="btn-primary">Save</button>
+                            </div>
+                            <p id="profile-save-status" class="settings-status"></p>
+                        </div>
+                    </div>
+                </div>
                 <div class="settings-section">
                     <h3>YouTube Data API Key</h3>
                     <p class="settings-desc">Enter your API key to fetch real YouTube videos for the card pool. Get one free at <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a> — enable "YouTube Data API v3" and create an API key.</p>

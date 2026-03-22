@@ -55,6 +55,20 @@ header {
 
 .logo span { color: var(--accent); }
 
+.header-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: default;
+}
+
+.header-avatar { font-size: 1.3rem; }
+.header-username { font-weight: 600; color: var(--text); }
+
 nav { display: flex; gap: 4px; }
 
 .nav-btn {
@@ -860,6 +874,190 @@ nav { display: flex; gap: 4px; }
 
 .top10-card-frame .card-thumbnail {
     aspect-ratio: 16/9;
+}
+
+.arena-rating-display {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    justify-content: center;
+    margin: 1rem 0 1.5rem;
+    font-size: 1.1rem;
+}
+
+.arena-rating-label { color: #889; }
+.arena-rating-value { font-weight: 900; font-size: 1.4rem; color: #ffb628; }
+.arena-record { color: #667; font-size: 0.9rem; }
+
+/* Arena tabs */
+.arena-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 1rem 0;
+    border-bottom: 2px solid #223;
+    padding-bottom: 0;
+}
+
+.arena-tab {
+    background: none;
+    border: none;
+    color: #667;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.arena-tab:hover { color: #aab; }
+.arena-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Opponent list */
+.arena-opponents-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.arena-opp-card {
+    background: linear-gradient(135deg, #1a1a2e, #252545);
+    border: 2px solid #334;
+    border-radius: 12px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+}
+
+.arena-opp-card:hover {
+    border-color: #4a9eff;
+    transform: translateY(-1px);
+}
+
+.arena-opp-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.6rem;
+}
+
+.arena-opp-avatar { font-size: 2rem; }
+.arena-opp-name { font-weight: 700; font-size: 1.05rem; }
+.arena-opp-rating { color: #889; font-size: 0.8rem; }
+
+.arena-opp-defense {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.arena-opp-def-card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    color: #aab;
+}
+
+/* Defense display */
+.arena-defense-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+}
+
+.arena-def-slot {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
+/* Defense log */
+.arena-log-entry {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    background: rgba(255,255,255,0.03);
+}
+
+.arena-log-entry.log-win { border-left: 3px solid #4ec94e; }
+.arena-log-entry.log-loss { border-left: 3px solid #ff3e5f; }
+
+.arena-log-avatar { font-size: 1.5rem; }
+.arena-log-info { flex: 1; }
+.arena-log-name { font-weight: 700; margin-right: 0.4rem; }
+.arena-log-result { color: #889; font-size: 0.85rem; }
+.arena-log-rating { font-weight: 700; font-size: 0.9rem; }
+.arena-log-rating.rating-up { color: #4ec94e; }
+.arena-log-rating.rating-down { color: #ff3e5f; }
+.arena-log-date { color: #556; font-size: 0.75rem; }
+
+.arena-match-code {
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: 0.5rem;
+    color: #fff;
+    background: linear-gradient(135deg, #1a1a2e, #252545);
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    border: 2px solid #4a9eff;
+    user-select: all;
+}
+
+.arena-handoff-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.arena-handoff-screen h2 {
+    font-size: 2rem;
+}
+
+.arena-handoff-screen p {
+    color: #889;
+    max-width: 400px;
+}
+
+.arena-start-btn {
+    margin-top: 1.5rem;
+    font-size: 1.1rem;
+    padding: 0.8rem 2.5rem;
+}
+
+.arena-mystery-card {
+    width: 100%;
+    height: 100%;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #556;
+    background: linear-gradient(135deg, #1a1a2e 0%, #252545 100%);
+    border: 2px dashed #334;
+    border-radius: 8px;
+}
+
+.card-thumbnail-placeholder {
+    width: 100%;
+    aspect-ratio: 16/9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    background: var(--bg-card, #1a1a2e);
 }
 
 .top10-card-frame .card-holo-overlay { border-radius: 6px; }
@@ -1804,6 +2002,77 @@ nav { display: flex; gap: 4px; }
     justify-content: center;
     margin-top: 20px;
     padding-bottom: 20px;
+}
+
+/* Profile editor */
+.profile-edit {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.profile-avatar-picker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.profile-current-avatar {
+    font-size: 3.5rem;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+}
+
+.profile-avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    max-width: 320px;
+}
+
+.avatar-option {
+    font-size: 1.4rem;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+}
+
+.avatar-option:hover {
+    border-color: #556;
+    transform: scale(1.15);
+}
+
+.avatar-option.selected {
+    border-color: var(--accent);
+    background: rgba(74,158,255,0.15);
+}
+
+.profile-name-edit {
+    flex: 1;
+    min-width: 200px;
+}
+
+.profile-name-edit label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+    color: #aab;
+    font-size: 0.85rem;
 }
 
 /* Responsive */
