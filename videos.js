@@ -89,8 +89,35 @@ async function addCardToCollection(video) {
             category: video.category,
             description: video.description || "",
             count: 1,
+            condition: "good",
             obtained_at: new Date().toISOString(),
         });
+    }
+    lsSet("collection", collection);
+    return { ok: true };
+}
+
+// Update a card's condition in localStorage
+async function updateCardCondition(videoId, condition) {
+    const collection = lsGet("collection", []);
+    const card = collection.find(c => c.video_id === videoId);
+    if (card) {
+        card.condition = condition;
+        lsSet("collection", collection);
+    }
+    return { ok: true };
+}
+
+// Remove a card from collection (burn). Returns true if removed.
+async function removeCardFromCollection(videoId) {
+    const collection = lsGet("collection", []);
+    const idx = collection.findIndex(c => c.video_id === videoId);
+    if (idx === -1) return { ok: false };
+    const card = collection[idx];
+    if (card.count > 1) {
+        card.count--;
+    } else {
+        collection.splice(idx, 1);
     }
     lsSet("collection", collection);
     return { ok: true };
@@ -108,6 +135,7 @@ async function loadCollection() {
         description: r.description || "",
         obtainedAt: r.obtained_at,
         count: r.count,
+        condition: r.condition || "good",
     }));
 }
 

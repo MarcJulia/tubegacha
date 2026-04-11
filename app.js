@@ -35,6 +35,36 @@
         "Art":           { atkMul: 1.00, defMul: 1.00, hpMul: 1.15, element: "Muse" },
     };
 
+    // Card condition system — 5 tiers with stat multipliers
+    const CONDITIONS = [
+        { name: "damaged",   label: "Damaged",   multiplier: 0.85, color: "#ff4444" },
+        { name: "worn",      label: "Worn",      multiplier: 0.92, color: "#cc8844" },
+        { name: "good",      label: "Good",      multiplier: 1.00, color: "#8899aa" },
+        { name: "excellent", label: "Excellent",  multiplier: 1.08, color: "#44bbff" },
+        { name: "pristine",  label: "Pristine",  multiplier: 1.15, color: "#ff44cc" },
+    ];
+
+    const DEFAULT_CONDITION = "good";
+
+    // Stardust earned per burn by rarity
+    const BURN_STARDUST = {
+        "common": 10,
+        "uncommon": 25,
+        "rare": 60,
+        "super-rare": 150,
+        "epic": 350,
+        "legendary": 800,
+        "mythic": 2000,
+    };
+
+    // Stardust cost to upgrade condition by one level
+    const UPGRADE_COST = {
+        "damaged": 20,    // damaged -> worn
+        "worn": 50,       // worn -> good
+        "good": 150,      // good -> excellent
+        "excellent": 500,  // excellent -> pristine
+    };
+
     // --- State (populated async from server in init) ---
     let state = {
         collection: [],
@@ -45,6 +75,7 @@
         raidsWon: 0,
         raidsLost: 0,
         cardsStolen: 0,
+        stardust: 0,
         battleHistory: [],
     };
 
@@ -153,7 +184,20 @@
         return RARITY_TIERS[RARITY_TIERS.length - 1];
     }
 
-    function getCardStats(video) {
+    function getCondition(name) {
+        return CONDITIONS.find(c => c.name === name) || CONDITIONS[2]; // default "good"
+    }
+
+    function getConditionIndex(name) {
+        return CONDITIONS.findIndex(c => c.name === name);
+    }
+
+    function getCardCondition(videoId) {
+        const entry = getCollectionEntry(videoId);
+        return entry && entry.condition ? entry.condition : DEFAULT_CONDITION;
+    }
+
+    function getCardStats(video, conditionOverride) {
         const rarity = getRarity(video);
         const profile = ELEMENT_PROFILES[video.category] || { atkMul: 1, defMul: 1, hpMul: 1, element: "Neutral" };
 
@@ -166,12 +210,16 @@
         const rawDef = rarity.def + Math.floor(variance * 0.8);
         const rawHp = rarity.hp + variance * 4;
 
+        const condName = conditionOverride || getCardCondition(video.id);
+        const cond = getCondition(condName);
+
         return {
-            atk: Math.floor(rawAtk * profile.atkMul),
-            def: Math.floor(rawDef * profile.defMul),
-            hp: Math.floor(rawHp * profile.hpMul),
+            atk: Math.floor(rawAtk * profile.atkMul * cond.multiplier),
+            def: Math.floor(rawDef * profile.defMul * cond.multiplier),
+            hp: Math.floor(rawHp * profile.hpMul * cond.multiplier),
             element: profile.element,
             category: video.category,
+            condition: cond,
         };
     }
 
@@ -207,7 +255,7 @@
 
     // --- Server-backed state loading ---
     async function loadStateFromServer() {
-        const [collection, battleHistory, packsLeftVal, raidsLeftVal, lastPackDayVal, totalPacksVal, raidsWonVal, raidsLostVal, cardsStolenVal] = await Promise.all([
+        const [collection, battleHistory, packsLeftVal, raidsLeftVal, lastPackDayVal, totalPacksVal, raidsWonVal, raidsLostVal, cardsStolenVal, stardustVal] = await Promise.all([
             loadCollection(),
             loadBattleHistory(),
             loadGameState("packsLeft"),
@@ -217,11 +265,11 @@
             loadGameState("raidsWon"),
             loadGameState("raidsLost"),
             loadGameState("cardsStolen"),
+            loadGameState("stardust"),
         ]);
 
         const today = getTodayKey();
-        const lastDay = lastPackDayVal || today;
-        const isNewDay = lastDay !== today;
+        const isNewDay = !lastPackDayVal || lastPackDayVal !== today;
 
         state.collection = collection;
         state.battleHistory = battleHistory;
@@ -232,6 +280,7 @@
         state.raidsWon = raidsWonVal || 0;
         state.raidsLost = raidsLostVal || 0;
         state.cardsStolen = cardsStolenVal || 0;
+        state.stardust = stardustVal || 0;
 
         if (isNewDay) {
             await saveGameState("lastPackDay", today);
@@ -338,6 +387,9 @@
 
         const icon = CATEGORY_ICONS[video.category] || "📺";
 
+        const cond = stats.condition;
+        const showCondition = cond.name !== "good"; // Only show badge if not default
+
         card.innerHTML = `
             <div class="card-frame">
                 ${["mythic","legendary","super-rare","epic"].includes(rarity.name) ? '<div class="card-holo-overlay"></div>' : ""}
@@ -382,6 +434,7 @@
 
                 <div class="card-bottom-bar">
                     ${rarityStars(rarity)}
+                    ${showCondition ? `<span class="condition-badge-small" style="color:${cond.color}">${cond.label}</span>` : ""}
                     <span class="rarity-badge ${rarity.name}">${rarity.label}</span>
                 </div>
             </div>
@@ -492,6 +545,11 @@
                     <div class="modal-stat"><span class="modal-stat-label">DEF</span><span class="modal-stat-val def">${stats.def}</span></div>
                     <div class="modal-stat"><span class="modal-stat-label">HP</span><span class="modal-stat-val hp">${stats.hp}</span></div>
                 </div>
+                <div class="modal-condition">
+                    <span class="modal-condition-label">Condition:</span>
+                    <span class="condition-badge" style="color:${stats.condition.color}">${stats.condition.label}</span>
+                    <span class="modal-condition-mult">(${stats.condition.multiplier}x stats)</span>
+                </div>
                 <div class="modal-card-meta">
                     <span>${formatViews(video.views)} views</span>
                     <span class="rarity-badge ${rarity.name}">${rarity.label}</span>
@@ -571,6 +629,7 @@
                     description: video.description || "",
                     obtainedAt: new Date().toISOString(),
                     count: 1,
+                    condition: DEFAULT_CONDITION,
                 });
             }
             await addToServerCollection(video);
@@ -1039,6 +1098,7 @@
                     description: stolenVideo.description || "",
                     obtainedAt: new Date().toISOString(),
                     count: 1,
+                    condition: DEFAULT_CONDITION,
                 });
             }
             await addToServerCollection(stolenVideo);
@@ -1547,6 +1607,262 @@
         ]);
     }
 
+    // ===========================
+    // WORKSHOP — Burn & Upgrade
+    // ===========================
+
+    let workshopState = {
+        mode: "burn",  // "burn" or "upgrade"
+        selectedBurnCards: [],  // array of videoIds for multi-burn
+        selectedCard: null,     // single card for upgrade
+    };
+
+    function switchWorkshopTab(tab) {
+        workshopState.mode = tab;
+        workshopState.selectedBurnCards = [];
+        workshopState.selectedCard = null;
+        document.querySelectorAll(".workshop-tab").forEach(b => b.classList.toggle("active", b.dataset.workshopTab === tab));
+        document.getElementById("workshop-burn-section").classList.toggle("hidden", tab !== "burn");
+        document.getElementById("workshop-upgrade-section").classList.toggle("hidden", tab !== "upgrade");
+        if (tab === "burn") renderBurnSection();
+        if (tab === "upgrade") renderUpgradeSection();
+    }
+
+    function updateStardustDisplay() {
+        document.getElementById("workshop-stardust").textContent = state.stardust.toLocaleString();
+    }
+
+    function renderBurnSection() {
+        updateStardustDisplay();
+        const grid = document.getElementById("burn-card-grid");
+        grid.innerHTML = "";
+
+        const entries = [...state.collection].sort((a, b) => {
+            const va = getVideoById(a.videoId);
+            const vb = getVideoById(b.videoId);
+            if (!va || !vb) return 0;
+            return getRarity(va).weight - getRarity(vb).weight;
+        });
+
+        if (entries.length === 0) {
+            grid.innerHTML = '<p class="empty-msg">No cards to burn. Open some packs first!</p>';
+            return;
+        }
+
+        entries.forEach(entry => {
+            const video = getVideoById(entry.videoId);
+            if (!video) return;
+            const rarity = getRarity(video);
+            const dust = BURN_STARDUST[rarity.name] || 10;
+            const isSelected = workshopState.selectedBurnCards.includes(video.id);
+
+            const card = createCardElement(video, { selectable: true, selected: isSelected });
+            const badge = document.createElement("div");
+            badge.className = "burn-dust-badge";
+            badge.innerHTML = `+${dust}`;
+            card.querySelector(".card-frame").appendChild(badge);
+
+            card.addEventListener("click", () => {
+                const idx = workshopState.selectedBurnCards.indexOf(video.id);
+                if (idx >= 0) {
+                    workshopState.selectedBurnCards.splice(idx, 1);
+                } else {
+                    workshopState.selectedBurnCards.push(video.id);
+                }
+                renderBurnSection();
+            });
+            grid.appendChild(card);
+        });
+
+        const btn = document.getElementById("burn-confirm-btn");
+        const preview = document.getElementById("burn-preview");
+        const selected = workshopState.selectedBurnCards;
+
+        if (selected.length > 0) {
+            let totalDust = 0;
+            const lines = selected.map(id => {
+                const video = getVideoById(id);
+                if (!video) return "";
+                const rarity = getRarity(video);
+                const dust = BURN_STARDUST[rarity.name] || 10;
+                totalDust += dust;
+                return `<div class="burn-preview-row">
+                    <span class="burn-preview-name">${escapeHtml(video.title)}</span>
+                    <span class="rarity-badge ${rarity.name}">${rarity.label}</span>
+                    <span class="burn-preview-dust-small">+${dust}</span>
+                </div>`;
+            }).join("");
+
+            preview.innerHTML = `
+                ${lines}
+                <div class="burn-preview-total">
+                    <span>${selected.length} card${selected.length > 1 ? "s" : ""}</span>
+                    <span class="burn-preview-arrow">&rarr;</span>
+                    <span class="burn-preview-dust">+${totalDust} Stardust</span>
+                </div>
+            `;
+            preview.classList.remove("hidden");
+            btn.disabled = false;
+            btn.textContent = selected.length === 1 ? "Burn Card" : `Burn ${selected.length} Cards`;
+        } else {
+            preview.classList.add("hidden");
+            btn.disabled = true;
+            btn.textContent = "Burn Card";
+        }
+    }
+
+    async function burnCard() {
+        const selected = [...workshopState.selectedBurnCards];
+        if (selected.length === 0) return;
+
+        let totalDust = 0;
+
+        for (const videoId of selected) {
+            const video = getVideoById(videoId);
+            if (!video) continue;
+
+            const rarity = getRarity(video);
+            const dust = BURN_STARDUST[rarity.name] || 10;
+            totalDust += dust;
+
+            const entry = getCollectionEntry(videoId);
+            if (!entry) continue;
+
+            if (entry.count > 1) {
+                entry.count--;
+            } else {
+                const idx = state.collection.findIndex(c => c.videoId === videoId);
+                if (idx >= 0) state.collection.splice(idx, 1);
+            }
+            await removeCardFromCollection(videoId);
+        }
+
+        state.stardust += totalDust;
+        await saveGameState("stardust", state.stardust);
+
+        workshopState.selectedBurnCards = [];
+
+        const feedback = document.getElementById("workshop-feedback");
+        feedback.textContent = `Burned ${selected.length} card${selected.length > 1 ? "s" : ""}! +${totalDust} Stardust`;
+        feedback.className = "workshop-feedback show";
+        setTimeout(() => feedback.className = "workshop-feedback", 1500);
+
+        renderBurnSection();
+    }
+
+    function renderUpgradeSection() {
+        updateStardustDisplay();
+        const grid = document.getElementById("upgrade-card-grid");
+        grid.innerHTML = "";
+
+        // Only show cards that can still be upgraded (not pristine)
+        const entries = [...state.collection].filter(e => {
+            const idx = getConditionIndex(e.condition || DEFAULT_CONDITION);
+            return idx < CONDITIONS.length - 1;
+        }).sort((a, b) => {
+            const va = getVideoById(a.videoId);
+            const vb = getVideoById(b.videoId);
+            if (!va || !vb) return 0;
+            return getRarity(vb).weight - getRarity(va).weight;
+        });
+
+        if (entries.length === 0) {
+            grid.innerHTML = '<p class="empty-msg">No cards to upgrade. All cards are Pristine or you have no cards!</p>';
+            return;
+        }
+
+        entries.forEach(entry => {
+            const video = getVideoById(entry.videoId);
+            if (!video) return;
+            const condName = entry.condition || DEFAULT_CONDITION;
+            const cost = UPGRADE_COST[condName];
+            const isSelected = workshopState.selectedCard === video.id;
+
+            const card = createCardElement(video, { selectable: true, selected: isSelected });
+            // Add upgrade cost badge
+            const badge = document.createElement("div");
+            badge.className = "upgrade-cost-badge" + (state.stardust >= cost ? "" : " insufficient");
+            badge.innerHTML = `${cost}`;
+            card.querySelector(".card-frame").appendChild(badge);
+
+            card.addEventListener("click", () => {
+                workshopState.selectedCard = workshopState.selectedCard === video.id ? null : video.id;
+                renderUpgradeSection();
+            });
+            grid.appendChild(card);
+        });
+
+        const btn = document.getElementById("upgrade-confirm-btn");
+        const preview = document.getElementById("upgrade-preview");
+        if (workshopState.selectedCard) {
+            const video = getVideoById(workshopState.selectedCard);
+            const entry = getCollectionEntry(workshopState.selectedCard);
+            const condName = entry.condition || DEFAULT_CONDITION;
+            const condIdx = getConditionIndex(condName);
+            const curCond = CONDITIONS[condIdx];
+            const nextCond = CONDITIONS[condIdx + 1];
+            const cost = UPGRADE_COST[condName];
+            const canAfford = state.stardust >= cost;
+
+            const curStats = getCardStats(video, condName);
+            const nextStats = getCardStats(video, nextCond.name);
+
+            preview.innerHTML = `
+                <div class="upgrade-preview-card-name">${escapeHtml(video.title)}</div>
+                <div class="upgrade-preview-conditions">
+                    <span class="condition-badge" style="color:${curCond.color}">${curCond.label}</span>
+                    <span class="upgrade-arrow">&rarr;</span>
+                    <span class="condition-badge" style="color:${nextCond.color}">${nextCond.label}</span>
+                </div>
+                <div class="upgrade-preview-stats">
+                    <span class="stat-change">ATK ${curStats.atk} &rarr; <strong>${nextStats.atk}</strong></span>
+                    <span class="stat-change">DEF ${curStats.def} &rarr; <strong>${nextStats.def}</strong></span>
+                    <span class="stat-change">HP ${curStats.hp} &rarr; <strong>${nextStats.hp}</strong></span>
+                </div>
+                <div class="upgrade-preview-cost ${canAfford ? "" : "cannot-afford"}">
+                    Cost: ${cost} Stardust ${canAfford ? "" : "(not enough!)"}
+                </div>
+            `;
+            preview.classList.remove("hidden");
+            btn.disabled = !canAfford;
+        } else {
+            preview.classList.add("hidden");
+            btn.disabled = true;
+        }
+    }
+
+    async function upgradeCard() {
+        if (!workshopState.selectedCard) return;
+        const entry = getCollectionEntry(workshopState.selectedCard);
+        if (!entry) return;
+        const condName = entry.condition || DEFAULT_CONDITION;
+        const condIdx = getConditionIndex(condName);
+        if (condIdx >= CONDITIONS.length - 1) return;
+        const cost = UPGRADE_COST[condName];
+        if (state.stardust < cost) return;
+
+        // Deduct stardust
+        state.stardust -= cost;
+        await saveGameState("stardust", state.stardust);
+
+        // Upgrade condition
+        const newCond = CONDITIONS[condIdx + 1].name;
+        entry.condition = newCond;
+        await updateCardCondition(workshopState.selectedCard, newCond);
+
+        // Flash feedback
+        const feedback = document.getElementById("workshop-feedback");
+        feedback.textContent = `Upgraded to ${CONDITIONS[condIdx + 1].label}!`;
+        feedback.className = "workshop-feedback show";
+        setTimeout(() => feedback.className = "workshop-feedback", 1500);
+
+        // If now pristine, deselect
+        if (condIdx + 1 >= CONDITIONS.length - 1) {
+            workshopState.selectedCard = null;
+        }
+        renderUpgradeSection();
+    }
+
     // --- Stats View ---
     function renderStats() {
         const uniqueCount = state.collection.length;
@@ -1554,6 +1870,7 @@
 
         document.getElementById("stat-total").textContent = totalCount;
         document.getElementById("stat-unique").textContent = uniqueCount;
+        document.getElementById("stat-stardust").textContent = state.stardust.toLocaleString();
         document.getElementById("stat-packs").textContent = state.totalPacksOpened;
         document.getElementById("stat-raids-won").textContent = state.raidsWon;
         document.getElementById("stat-raids-lost").textContent = state.raidsLost;
@@ -1652,6 +1969,11 @@
         document.querySelector(`[data-view="${viewName}"]`).classList.add("active");
 
         if (viewName === "collection") renderCollection();
+        if (viewName === "workshop") {
+            workshopState.selectedBurnCards = [];
+            workshopState.selectedCard = null;
+            switchWorkshopTab("burn");
+        }
         if (viewName === "top10") renderTop10();
         if (viewName === "stats") renderStats();
         if (viewName === "raid") {
@@ -1705,6 +2027,13 @@
         document.getElementById("profile-randomize-btn").addEventListener("click", () => {
             document.getElementById("profile-name-input").value = generateRandomName();
         });
+
+        // Workshop controls
+        document.querySelectorAll(".workshop-tab").forEach(btn => {
+            btn.addEventListener("click", () => switchWorkshopTab(btn.dataset.workshopTab));
+        });
+        document.getElementById("burn-confirm-btn").addEventListener("click", burnCard);
+        document.getElementById("upgrade-confirm-btn").addEventListener("click", upgradeCard);
 
         // Collection filters
         document.querySelectorAll(".filter-btn").forEach(btn => {

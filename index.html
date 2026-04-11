@@ -19,6 +19,7 @@
             <nav>
                 <button class="nav-btn active" data-view="pack">Pack</button>
                 <button class="nav-btn" data-view="collection">Collection</button>
+                <button class="nav-btn" data-view="workshop">Workshop</button>
                 <button class="nav-btn" data-view="raid">Raid</button>
                 <button class="nav-btn" data-view="arena">Arena</button>
                 <button class="nav-btn" data-view="top10">Top 10</button>
@@ -67,6 +68,88 @@
                 </div>
                 <div id="collection-grid" class="card-grid"></div>
                 <p id="empty-collection" class="empty-msg hidden">No cards yet! Open some packs to start collecting.</p>
+            </section>
+
+            <!-- Workshop View -->
+            <section id="view-workshop" class="view">
+                <div class="workshop-header">
+                    <h2>Workshop</h2>
+                    <div class="stardust-display">
+                        <span class="stardust-icon">&#10022;</span>
+                        <span class="stardust-amount" id="workshop-stardust">0</span>
+                        <span class="stardust-label">Stardust</span>
+                    </div>
+                </div>
+                <p class="raid-desc">Burn duplicate cards for Stardust, then spend it to upgrade your cards' condition. Better condition = stronger stats!</p>
+
+                <div class="workshop-tabs">
+                    <button class="workshop-tab active" data-workshop-tab="burn">Burn Cards</button>
+                    <button class="workshop-tab" data-workshop-tab="upgrade">Upgrade Cards</button>
+                </div>
+
+                <div id="workshop-feedback" class="workshop-feedback"></div>
+
+                <!-- Burn Section -->
+                <div id="workshop-burn-section">
+                    <div class="workshop-info-box">
+                        <h3>Burn for Stardust</h3>
+                        <p>Sacrifice a card to earn Stardust. Rarer cards yield more dust.</p>
+                        <div class="burn-rates">
+                            <span class="burn-rate"><span class="rarity-badge common">Common</span> 10</span>
+                            <span class="burn-rate"><span class="rarity-badge uncommon">Uncommon</span> 25</span>
+                            <span class="burn-rate"><span class="rarity-badge rare">Rare</span> 60</span>
+                            <span class="burn-rate"><span class="rarity-badge super-rare">Super Rare</span> 150</span>
+                            <span class="burn-rate"><span class="rarity-badge epic">Epic</span> 350</span>
+                            <span class="burn-rate"><span class="rarity-badge legendary">Legendary</span> 800</span>
+                            <span class="burn-rate"><span class="rarity-badge mythic">Mythic</span> 2000</span>
+                        </div>
+                    </div>
+                    <div id="burn-preview" class="burn-preview hidden"></div>
+                    <div class="workshop-action-bar">
+                        <button id="burn-confirm-btn" class="btn-burn" disabled>Burn Card</button>
+                    </div>
+                    <div id="burn-card-grid" class="card-grid selectable-grid"></div>
+                </div>
+
+                <!-- Upgrade Section -->
+                <div id="workshop-upgrade-section" class="hidden">
+                    <div class="workshop-info-box">
+                        <h3>Upgrade Condition</h3>
+                        <p>Spend Stardust to improve a card's condition. Each level boosts all stats.</p>
+                        <div class="condition-tiers">
+                            <div class="condition-tier">
+                                <span class="condition-badge" style="color:#ff4444">Damaged</span>
+                                <span class="condition-mult">0.85x</span>
+                                <span class="condition-cost">&rarr; 20</span>
+                            </div>
+                            <div class="condition-tier">
+                                <span class="condition-badge" style="color:#cc8844">Worn</span>
+                                <span class="condition-mult">0.92x</span>
+                                <span class="condition-cost">&rarr; 50</span>
+                            </div>
+                            <div class="condition-tier">
+                                <span class="condition-badge" style="color:#8899aa">Good</span>
+                                <span class="condition-mult">1.00x</span>
+                                <span class="condition-cost">&rarr; 150</span>
+                            </div>
+                            <div class="condition-tier">
+                                <span class="condition-badge" style="color:#44bbff">Excellent</span>
+                                <span class="condition-mult">1.08x</span>
+                                <span class="condition-cost">&rarr; 500</span>
+                            </div>
+                            <div class="condition-tier">
+                                <span class="condition-badge" style="color:#ff44cc">Pristine</span>
+                                <span class="condition-mult">1.15x</span>
+                                <span class="condition-cost max-tier">MAX</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="upgrade-preview" class="upgrade-preview hidden"></div>
+                    <div class="workshop-action-bar">
+                        <button id="upgrade-confirm-btn" class="btn-upgrade" disabled>Upgrade Card</button>
+                    </div>
+                    <div id="upgrade-card-grid" class="card-grid selectable-grid"></div>
+                </div>
             </section>
 
             <!-- Raid View -->
@@ -331,6 +414,10 @@
                     <div class="stat-card">
                         <div class="stat-value" id="stat-unique">0</div>
                         <div class="stat-label">Unique Cards</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value stardust-color" id="stat-stardust">0</div>
+                        <div class="stat-label">Stardust</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="stat-mythic">0</div>
